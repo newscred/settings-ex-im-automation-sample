@@ -1,0 +1,25 @@
+{
+  "resources": {
+    "labels": [],
+    "custom_fields": {
+      "dropdown": [],
+      "multi_select_dropdown": [],
+      "multichoice": [],
+      "checkbox": [],
+      "string": [],
+      "textarea": [],
+      "currency": [],
+      "number": [],
+      "percentage": [],
+      "date": [],
+      "image": [],
+      "video": [],
+      "richtext": []
+    },
+    "workflows": [],
+    "webhooks": [],
+    "apps": [],
+    "templates": [],
+    "routing_rules": []
+  }
+}
