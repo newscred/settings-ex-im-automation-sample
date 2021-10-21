@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Welcome Open API documentation</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /**********************Graphik Fonts************************
+***************************************************************/
+
+    @font-face {
+      font-family: 'Graphik';
+      font-style: normal;
+      font-weight: 300;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Light-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Light-Web.woff') format('woff');
+    }
+
+    @font-face {
+      font-family: 'Graphik';
+      font-style: normal;
+      font-weight: 400;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Regular-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Regular-Web.woff') format('woff');
+    }
+
+    @font-face {
+      font-family: 'Graphik';
+      font-style: normal;
+      font-weight: 500;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Medium-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Medium-Web.woff') format('woff');
+    }
+
+    @font-face {
+      font-family: 'Graphik';
+      font-style: normal;
+      font-weight: 600;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Semibold-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Semibold-Web.woff') format('woff');
+    }
+
+    @font-face {
+      font-family: 'Graphik';
+      font-style: normal;
+      font-weight: 700;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Bold-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Bold-Web.woff') format('woff');
+    }
+
+
+    @font-face {
+      font-family: 'Graphik Regular';
+      font-style: normal;
+      font-weight: 300;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Light-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Light-Web.woff') format('woff');
+    }
+
+
+    @font-face {
+      font-family: 'Graphik Regular';
+      font-style: normal;
+      font-weight: 400;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Regular-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Regular-Web.woff') format('woff');
+    }
+
+    @font-face {
+      font-family: 'Graphik Regular';
+      font-style: normal;
+      font-weight: 500;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Medium-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Medium-Web.woff') format('woff');
+    }
+
+    @font-face {
+      font-family: 'Graphik Regular';
+      font-style: normal;
+      font-weight: 700;
+      font-display: auto;
+      src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Bold-Web.woff2') format('woff2'),
+        url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Bold-Web.woff') format('woff');
+    }
+
+
+
+    /**********************Global Variables************************
+***************************************************************/
+
+    :root {
+      --dark: #191932;
+      --grey4: #474759;
+      --grey3: #808091;
+      --grey2: #CCCCDC;
+      --grey1: #EDEDF4;
+      --primary: #702BD8;
+      --spring-green: #5FEEAD;
+
+      --welcome-font: "Graphik", Arial, Helvetica, sans-serif;
+
+      --big-font-size: 1.6rem;
+      --default-font-size: 1.4rem;
+      --small-font-size: 1.2rem;
+    }
+
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: inherit;
+      font-family: var(--welcome-font);
+    }
+
+    html {
+      font-size: 62.5%;
+    }
+
+    body {
+      box-sizing: border-box;
+      font-family: var(--welcome-font);
+      color: var(--dark);
+      font-size: var(--big-font-size) !important;
+    }
+
+
+    h1 {
+      font-family: var(--welcome-font) !important;
+      font-weight: 500 !important;
+      color: var(--dark) !important;
+      font-size: 3.2rem !important;
+      line-height: 4rem !important;
+    }
+
+    h2 {
+      font-family: var(--welcome-font) !important;
+      font-weight: 500 !important;
+      color: var(--dark) !important;
+      font-size: 2.4rem !important;
+      line-height: 3rem !important;
+    }
+
+    h2 {
+      font-family: var(--welcome-font) !important;
+      font-weight: 500 !important;
+      color: var(--dark) !important;
+      font-size: 1.8rem !important;
+      line-height: 2.4rem !important;
+    }
+
+    strong {
+      font-family: var(--welcome-font) !important;
+      font-weight: 500 !important;
+    }
+
+    p {
+      font-family: var(--welcome-font) !important;
+      font-weight: 400 !important;
+      color: var(--dark) !important;
+      font-size: var(--default-font-size) !important;
+      line-height: 2rem !important;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="header">
+    <a href="/"><img src="Welcome-Logo.svg" alt="" class="header__logo"> </a>
+    <ul class="nav">
+      <li><a href="/openapi.html?hash=QPYxst">Open API</a></li>
+      <li><a href="/webhooks.html?hash=QPYxst">Webhook</a></li>
+    </ul>
+  </header>
+  <redoc spec-url='openapi.yml?hash=QPYxst'></redoc>
+  <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"> </script>
+</body>
+
+</html>

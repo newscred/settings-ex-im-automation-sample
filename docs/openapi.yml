@@ -1,0 +1,5633 @@
+openapi: 3.0.0
+
+servers:
+  - url: https://api.welcomesoftware.com/v3
+    description: v3 version of _Welcome_ Open API
+
+info:
+  version: 'V3'
+  title: Welcome Open API Documentation
+  description: |
+    # Introduction
+
+    _Welcome_ Open API Documentation.
+
+    Base URL: https://api.welcomesoftware.com/v3
+
+    _**Note**: From 28th March 2021, we are serving open API through https://api.welcomesoftware.com/v3. We encourage to update your integrations to use the new base URL. The previous base URL: https://api.newscred.com/v3 will remain functional as it used to be until any further notice._
+
+    _Welcome_ also offers webhooks for certain events. [Webhooks documentation](webhooks.html).
+
+    # Authentication
+
+    _Welcome_ Open API uses OAuth 2.0 as it's authorization mechanism. In order to consume the API you need to register an OAuth 2.0 app for a _Welcome_ organization.
+
+    The supported OAuth 2.0 flow is [`authorization code`](https://tools.ietf.org/html/rfc6749#section-4.1). In this flow the OAuth 2.0 app needs to be a web app hosted in a server. The server hosting the web app must know and protect the `client id` and `client secret`.
+
+    ## Authorization server
+    1. Host: `https://accounts.welcomesoftware.com`
+    2. Authorization endpoint: `https://accounts.welcomesoftware.com/o/oauth2/v1/auth`
+    3. Scopes: `openid`, `profile` and `offline_access` (These scopes are delimited by a single space. All of these scopes must be passed to the authorization endpoint)
+    4. Token endpoint: `https://accounts.welcomesoftware.com/o/oauth2/v1/token`
+    5. Userinfo endpoint (can be used to validate access token): `https://accounts.welcomesoftware.com/o/oauth2/v1/userinfo`
+
+    ## Registering OAuth 2.0 apps in Welcome
+    To register an app, you will need to provide the following information
+    - **_Welcome_ Organization name**: Name of a _Welcome_ Organization for which the app will be registered
+    - **Redirect URL**: A valid URL of the server hosting the web app where the _Welcome_ authorization server will send back the authorization code
+    - **App name**: A name for the app
+
+    On successful registration, you will receive a `client_id` and a `client_secret` from _Welcome_ with which you can request for `access_token` and `refresh_token` from the _Welcome_ authorization server.
+
+    ## Authorization code flow
+    _Welcome_ supports only the authorization code flow for OAuth 2.0.
+
+    <img src="/oauth-flow.png" alt="OAuth 2.0">
+
+    1. User opens the web app in browser. User must be registered with the organization with which the app is associated.
+    1. User performs some action in the web app to begin the authorization process. In usual case it is clicking a button.
+    1. User is redirected to the authorization server.
+        ```
+        HTTP GET
+        https://accounts.welcomesoftware.com/o/oauth2/v1/auth?client_id=12345678-1234-1234-1234-123456789012&redirect_uri=https://my-web-app.com/o/oauth/callback&response_type=code&scope=openid%20profile%20offline_access
+        ```
+        `client_id` is the client id of the app that you have registered, and `redirect_uri` is the redirect url of the app provided when the app was registered.
+    1. Authorization server logs the user in, if user is not logged in.
+    1. Through logging in, user gives the consent to the app to access the user's data from _Welcome_.
+    1. User is redirected to the redirect url of the app with the authorization code.
+        ```
+        HTTP GET
+        https://my-web-app.com/o/oauth/callback?code=87654321-4321-4321-4321-210987654321
+        ```
+        `code` is the authorization code.
+    1. The web app makes an HTTP POST request to the authorization server to obtain an `access_token` and a `refresh_token`
+        ```
+        HTTP POST
+        https://accounts.welcomesoftware.com/o/oauth2/v1/token
+
+        Request payload:
+            {
+                "client_id": "12345678-1234-1234-1234-123456789012",
+                "client_secret": "my-encrypted-secret-1234",
+                "code": "87654321-4321-4321-4321-210987654321",
+                "grant_type": "authorization_code",
+                "redirect_uri": "https://my-web-app.com/o/oauth/callback"
+            }
+
+        Response payload:
+            {
+                "access_token": "b3717c0a-6857-4858-8274-9fe7b51180c9",
+                "refresh_token": "ff7d31df-ad4d-4a62-9291-877df0757478",
+                "id_token": "some-jwt-token",
+                "expires_in": 3599,
+                "token_type": "Bearer"
+            }
+        ```
+    1. (Optional) Server can validate the received access token by making an HTTP GET request to the authorization server by passing the `access_token` in the `Authorization` HTTP header with `Bearer ` prefix. For example
+        ```
+        HTTP GET
+        https://accounts.welcomesoftware.com/o/oauth2/v1/userinfo
+
+        Headers:
+          Authorization: Bearer b3717c0a-6857-4858-8274-9fe7b51180c9
+        ```
+    1. Now the web server can use the Open API by passing the `access_token` in the `Authorization` HTTP header with `Bearer ` prefix. For example
+        ```
+        HTTP GET
+        https://api.welcomesoftware.com/v3/assets
+
+        Headers:
+          Authorization: Bearer b3717c0a-6857-4858-8274-9fe7b51180c9
+        ```
+    1. If the `access_token` expires, the web server can get a new `access_token`, using the `refresh_token`, by making an HTTP POST request to the authorization server
+        ```
+        HTTP POST
+        https://accounts.welcomesoftware.com/o/oauth2/v1/token
+
+        Request payload:
+            {
+                "client_id": "12345678-1234-1234-1234-123456789012",
+                "client_secret": "my-encrypted-secret-1234",
+                "refresh_token": "ff7d31df-ad4d-4a62-9291-877df0757478",
+                "grant_type": "refresh_token"
+            }
+
+        Response payload:
+            {
+                "access_token": "bd680785-b090-40ca-9a32-22df51e96e7a",
+                "refresh_token": "e053d83e-14e1-4ba4-b18e-ea654b39a02e",
+                "id_token": "some-jwt-token",
+                "expires_in": 3599,
+                "token_type": "Bearer"
+            }
+        ```
+
+    ## Token revocation
+    You can revoke the tokens generated by the Authorization code flow.
+
+    ### Revoke access token
+    Revoke an `access_token` by making an HTTP POST request to the authorization server.
+      ```
+      HTTP POST
+      https://accounts.welcomesoftware.com/o/oauth2/v1/revoke
+
+      Request payload:
+          {
+            "token": "bd680785-b090-40ca-9a32-22df51e96e7a",
+            "token_type_hint": "access_token",
+            "client_id": "12345678-1234-1234-1234-123456789012",
+            "client_secret": "my-encrypted-secret-1234"
+          }
+
+      Response payload:
+          {
+              "msg": "success"
+          }
+      ```
+
+    ### Revoke refresh token
+    Revoke a `refresh_token` by making an HTTP POST request to the authorization server.
+      ```
+      HTTP POST
+      https://accounts.welcomesoftware.com/o/oauth2/v1/revoke
+
+      Request payload:
+          {
+            "token": "e053d83e-14e1-4ba4-b18e-ea654b39a02e",
+            "token_type_hint": "refresh_token",
+            "client_id": "12345678-1234-1234-1234-123456789012",
+            "client_secret": "my-encrypted-secret-1234"
+          }
+
+      Response payload:
+          {
+              "msg": "success"
+          }
+      ```
+
+    ### Revoke token without mentioning any token type
+    A token can be revoked without passing the `token_hint_type` field in the request payload. The passed token can either be an `access_token` or a `refresh_token`. The authorization server will automatically deduce the type of the token and revoke it.
+      ```
+      HTTP POST
+      https://accounts.welcomesoftware.com/o/oauth2/v1/revoke
+
+      Request payload:
+          {
+            "token": "e053d83e-14e1-4ba4-b18e-ea654b39a02e",
+            "client_id": "12345678-1234-1234-1234-123456789012",
+            "client_secret": "my-encrypted-secret-1234"
+          }
+
+      Response payload:
+          {
+              "msg": "success"
+          }
+      ```
+
+    ## Organization association
+    An app must be associated with a _Welcome_ organization. An app cannot be associated with multiple _Welcome_ organizations.
+
+    ## Resource Owner
+    The resource owner authorizing the app, i.e. the _Welcome_ user whose data will be accessed via the Open API, must be registered with the associated organization.
+
+    ## App modes
+    Apps can be created in `development` or in `production` mode depending on your need. If you plan to develop a new app and not publish it to real users, you can leverage the `development` mode for longer TTL.
+
+    ### Development mode
+    - TTL for access token: 30 days
+
+    ### Production mode
+    - TTL for access token: 1 hour
+
+    # Uploading assets
+
+    ## Uploading assets (images, videos and raw files) to Library or Task
+    1. Fetch the presigned upload URL and it's related meta fields using the [`GET /v3/upload-url`](#tag/Uploader/paths/~1upload-url/get) endpoint. **The validity time for this URL is 60 minutes**.
+    1. Upload the file, along with the related meta fields, through an HTTP POST request to the presigned upload URL. Payload must be in `multipart/form-data`. The field name for the file must be `file`. Please make sure that the meta fields are in the same order as they are received. The `file` field must be appended at the end. **If this url is hit multiple times with the same meta fields, the last successfully uploaded file will be used to create the asset in the next step**.
+    1. Upon success (204 HTTP response code) from the presigned URL, hit the POST endpoint for desired destination (Library or Task) passing the `key` which was previously obtained from the `GET /v3/upload-url` endpoint and an arbitrary `title` as the request payload. **If this endpoint is hit multiple times with the same `key`, each time a new asset will be created for the same uploaded file**.
+
+    #### POST endpoints:
+     - Add asset to Library: [`POST /v3/assets`](#tag/Library/paths/~1assets/post)
+     - Add version to a Library Asset: [`POST /v3/assets/{asset_id}/versions`](#tag/Library/paths/~1assets~1{asset_id}~1versions/post)
+     - Add asset to a Task: [`POST /v3/tasks/{id}/assets`](#tag/Tasks/paths/~1tasks~1{id}~1assets/post)
+     - Add draft to a Task Asset: [`POST /v3/tasks/{task_id}/assets/{asset_id}/drafts`](#tag/Tasks/paths/~1tasks~1{task_id}~1assets~1{asset_id}~1drafts/post)
+
+    # Updating a resource
+
+    ## Labels PATCH behavior
+    Suppose a resource has the following `labels`:
+    ```
+    - group: P
+      - values: a, b, c
+    - group: Q
+      - values: x, y, z
+    ```
+    Now if a PATCH request is made with the following `labels`:
+    ```
+    - group: R
+      - values: i, j
+    ```
+    Then the updated resource will have the following `labels`:
+    ```
+    - group: R
+      - values: i, j
+    ```
+
+    # Rate limiting
+    - **Rate limit:** 10 requests per second per organization
+    - **Request quota:** 200,000 requests per month per organization
+
+    # Backward compatibility
+
+    The following changes are considered to be backward compatible for _Welcome_ Open API:
+
+    - Adding a new endpoint or support for a new HTTP method
+    - Adding a new field to the response payload
+    - Adding a new optional field to the request payload
+    - Adding support for an optional query parameter
+    - Adding a value to an enum
+    - Adding support for a new optional request header
+    - Adding a new response header
+
+    # Recommendations
+
+    - Do not build URLs manually to fetch related resources, rather use the URLs provided in the `links` field in the response as-is without any manipulation.
+
+tags:
+  - name: Uploader
+  - name: Library
+  - name: Labels
+  - name: Tasks
+    description: |
+      These endpoints are primarily used to facilitate the integration of external systems with _Welcome_ through the following two use cases:
+
+      1. **External Work Management**: When a single step in the _Welcome_ workflow is to be monitored by an external system such as in the case of Jira, AHa!, or any other type of project management system. These endpoints can be used to link the _Welcome_ step to an external system 'ticket'. Subsequently, the external system can send status updates back to _Welcome_ so that the _Welcome_ user receives in-app updates as to the status of the 'ticket' in the external system.
+
+      2. **External Document Approval** (a.k.a. Marketing Legal Review): When a single step in the _Welcome_ workflow is to defer approval of marketing assets to an external system such as in the case of Veeva PromoMats. These endpoints can be used to link the _Welcome_ step and all of the content assets to the external system so that they can be reviewed, annotated/updated, and then finally approved. Subsequently, the approval status can be sent back to _Welcome_ so that the _Welcome_ user receives in-app updates as to the final approval status of the documents from the external system.
+
+      For more information on these use cases, please contact _Welcome_ Support for further assistance.
+  - name: Campaigns
+  - name: Users
+  - name: Settings
+
+x-tagGroups:
+  - name: API
+    tags:
+      - Uploader
+      - Library
+      - Labels
+      - Tasks
+      - Campaigns
+      - Users
+      - Settings
+
+paths:
+  /upload-url:
+    get:
+      tags:
+        - Uploader
+      summary: GET /upload-url
+      description: Get a presigned URL and related meta fields to upload a file. **The validity time for this URL is 60 minutes**.
+      responses:
+        '200':
+          description: Fetched presigned upload URL and related meta fields
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  url:
+                    description: Presigned URL to use for uploading a file with an **HTTP POST** request as `multipart/form-data`
+                    type: string
+                    example: https://newscred-cmp-files.s3-accelerate.amazonaws.com/
+                  upload_meta_fields:
+                    description: Related meta fields to upload a file. **Items within this field must be sent along as paylod of the POST request, along with the file, to the presigned upload URL**
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      key:
+                        description: Unique identifier of the file upload session. **This key must be used in the `POST /v3/assets` endpoint to complete the asset upload**
+                        type: string
+                        example: ce8995aea58b11ea8cd90242ac120005
+                      policy:
+                        # description: Base64 encoded policy of s3 for the file being uploaded
+                        type: string
+                        example: eyJleHBpcmF0aW9uIjogIjIwMjAtMDYtMDNUMTY6MTc6NTbbbbbbImNvbmRpdGlvbnMiOiBbeyJidWNrZXQiOiAibmV3c2NyZWQtY21wLWZpbGVzIn0sIHsia2V5IjogIjY3Y2NhMzcxYTVhZDExZWFiNDNhMGExMjlmMDhlZWQ5In0sIHsieC1hbXotYWxnb3JpdGhtIjogIkFXUzQtSE1BQy1TSEEyNTYifSwgeyJ4LWFtei1jcmVkZW50aWFsIjogIkFTSUFVTlVMQkwzV082RDdSWkZILzIwMjAwNjAzL3VzLWVhc3QtMS9zMy9hd3M0X3JlcXVlc3QifSwgeyJ4LWFtei1kYXRlIjogIjIwMjAwNjAzVDE1MTc1N1oifSwgeyJ4LWFtei1zZWN1cml0eS10b2tlbiI6ICJJUW9KYjNKcFoybHVYMlZqRUE4YUNYVnpMV1ZoYzNRdE1TSkhNRVVDSUQrc2FrelZIK05zN0Z4UmtsaW9CZFdldjdZRXlIcHBoVjEyNnRsL0ZadjNBaUVBODFOV1l5TUt1L0UvZ1FyaUlhaVhMaXpxSFFuNnlxTWlWSzQzeU9xYTUaaaaaaU1JZHhBQUdnd3pNRFF4TmpBMU16QXhOVFlpRERxMlN3dVJTR2ZGL2hGRXpDcVJBMlo4NmpkRzNQczMzY3c5bFpFeVBpbmdWSnV0WUQ0RXZuU291NFR1NG9WaGhEZUwyS0QxdFREZmMrNHJmVWRMQ2Y1SWpzb3VRYldMekIzczRXZ2xMQUJFOFJ0VUM5K0o1bVpJUTlYNzJVa0xOUjA0UURpVlliSjdxNS95S25VNUFSZWUzQXdqVHp3UWZPS3dsTnRFODYyVWo4MXlWbDhMdS81d3kwaU5hZFpvbkZPcVBONldJWURpdi9MVzlLKzhWNjRNS2E5bDhtcG1kVll3RWJ2dTRiMENJVFIxQ0tjUHlzVkFNODBKdnZ0aklvQTZXc3RDcWxiM0ZHZEFGVmlnaDdId3JKL3greFNZVU5YVzFvaFNlUExDNXFPSCtoZ2ZqRFVOSDMvbXhEV2V4dWhQbDFGSjF6VlpZQzBMY2U0Y1F6dEtPbTgzZFBqcWI4a09pQVBUWVB3MGFmYnl0QUQyVE8vTmhZdHlvU1BzL0xWS1FYWXhyYk5MZ3N6azRMUjdLeUEydlA5NkJRMll6aVhnWDhTTm13bklDcWRiY2dzZitvNnBWOXRlTlJIczdIS3N2Qm9HYVFESTVhUDQrcmQ1K0h0aWM3RUZqSDlDUkk1bnBpL3cvTVlodkc0dXljWDR4cEJSeE5iSURWbFpuYTBEaUkvVkxmV3JjOWtkUFBhdm10QVhtVHR1U2c4aFFVMnNzMSt0dEJqaE1NRGkzdllGT3VzQnJEMDMyc1BlMWx0QUNRSzlVQUxEUmFYT2VIWjNXbThTVjZlMTErWVhnd3JKZkloQlp2a053OGxHdkRuN2FSK2hXUkpPazljY3pHOC9DTzRqZk8xVlpkZ3N2YU5PaEhpc01sQXVOMVJXallXUGJWRkRoajV3ekZ0OTQrcmJwdFd3dk9vamtXVElUM0o5SWtSNTF6SWJhc1VqTW4rOHRiSjFJbHJnWVFOaDVaaUVPTGZ1bFVHZWl1L2xXdERFbFhKUy9sS0pUTnV1YU1DRnU0NnBocTlvVE9EMWtmSVYrUEFxZEZYV2xQbVZKK3lXeGRLellSV1creDdERjJ6dnZmZm1nc0JBWU01eDh6aEJ3YWIrSXkvTGR6eWdQVUFnaTFTUE9oSktFRjNBejU4aVArdGFDbUxhdmo5cGFRPT0ifV19
+                      x-amz-algorithm:
+                        # description: Hash algorithm that is used to create the request signature
+                        type: string
+                        example: AWS4-HMAC-SHA256
+                      x-amz-credential:
+                        # description: Credential scope value of aws
+                        type: string
+                        example: ASIAAAAAAA3WO6D7RZFH/20343603/us-east-1/s3/aws4_request
+                      x-amz-date:
+                        # description: Date that is used to create the signature. The format must be ISO 8601 basic format
+                        type: string
+                        example: 20200603T151757Z
+                      x-amz-security-token:
+                        # description: Temporary security token from aws
+                        type: string
+                        example: IQoJb3JpZ2luX2VjEA8ccccccWVhc3QtMSJHMEUCID+sakzVH+Ns7FxRklioBdWev7YEyHpphV126tl/FZv3AiEA81NWYyMKu/E/gQriIaiXLizqHQn6yqMiVK43yOqa52AqtAMIdxAAGgwzMDQxNjA1MzAxNTYiDDq2SwuRSGfFddddddqRA2Z86jdG3Ps33cw9lZEyPingVJutYD4EvnSou4Tu4oVhhDeL2KD1tTDfc+4rfUdLCf5IjsouQbWLzB3s4WglLABE8RtUC9+J5mZIQ9X72UkLNR04QDiVYbJ7q5/yKnU5ARee3AwjTzwQfOKwlNtE862Uj81yVl8Lu/5wy0iNadZonFOqPN6WIYDiv/LW9K+8V64MKa9l8mpmdVYwEbvu4b0CITR1CKcPysVAM80JvvtjIoA6WstCqlb3FGdAFVigh7HwrJ/x+xSYUNXW1ohSePLC5qOH+hgfjDUNH3/mxDWexuhPl1FJ1zVZYC0Lce4cQztKOm83dPjqb8kOiAPTYPw0afbytAD2TO/NhYtyoSPs/LVKQXYxrbNLgszk4LR7KyA2vP96BQ2YziXgX8SNmwnICqdbcgsf+o6pV9teNRHs7HKsvBoGaQDI5aP4+rd5+Htic7EFjH9CRI5npi/w/MYhvG4uycX4xpBRxNbIDVlZna0DiI/VLfWrc9kdPPavmtAXmTtuSg8hQU2ss1+ttBjhMMDi3vYFOusBrD032sPe1ltACQK9UALDRaXOeHZ3Wm8SV6e11+YXgwrJfIhBZvkNw8lGvDn7aR+hWRJOk9cczG8/CO4jfO1VZdgsvaNOhHisMlAuN1RWjYWPbVFDhj5wzFt94+rbptWwvOojkWTIT3J9IkR51zIbasUjMn+8tbJ1IlrgYQNh5ZiEOLfulUGeiu/lWtDElXJS/lKJTNuuaMCFu46phq9oTOD1kfIV+PAqdFXWlPmVJ+yWxdKzYRWW+x7DF2zvvffmgsBAYM5x8zhBwab+Iy/LdzygPUAgi1SPOhJKEF3Az58iP+taCmLavj9paQ==
+                      x-amz-signature:
+                        # description: Specifies the hex-encoded signature that was calculated from the string to sign and the derived signing key
+                        type: string
+                        example: 0e67ede744d4aed62aaaaaa8e87648b3e98a3e611ccccccc89963bcf70bd02f9
+                    required:
+                      - key
+                      - policy
+                      - x-amz-algorithm
+                      - x-amz-credential
+                      - x-amz-date
+                      - x-amz-security-token
+                      - x-amz-signature
+                required:
+                  - url
+                  - upload_meta_fields
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /folders:
+    get:
+      tags:
+        - Library
+      summary: GET /folders
+      description: Get the list of folders. Folders are sorted by `modified_at` in descending order.
+      parameters:
+        - name: parent_folder_id
+          in: query
+          required: false
+          description: ID of the parent folder to filter by
+          schema:
+            type: string
+          example: 1d9d8aeca10811ebbc640242ac12001b
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: List of fetched folders
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of folders
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FolderResponse'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/folders?offset=10&page_size=10
+                required:
+                  - data
+                  - pagination
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /folders/{id}:
+    get:
+      tags:
+        - Library
+      summary: GET /folders/{id}
+      description: Get a folder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the folder
+          example: 5d7f910551b00a722e0418830cee6632
+      responses:
+        '200':
+          description: Fetched folder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FolderResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /assets:
+    get:
+      tags:
+        - Library
+      summary: GET /assets
+      description: |
+        Get the list of assets. Assets are sorted by `modified_at` in descending order.
+        To get assets which are not inside any folder just pass `include_subfolder_assets=false` in the query param.
+      parameters:
+        - name: type
+          in: query
+          description: "Asset type to filter by. Example: `type=image&type=video`"
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - article
+                - image
+                - video
+                - raw_file
+            default: ['article', 'image', 'video', 'raw_file']
+          style: form
+          explode: true
+          examples:
+            single:
+              summary: Filter by a single type
+              value: ['image']
+            multiple:
+              summary: Filter by multiple types
+              value: ['article', 'image', 'video']
+        - name: label
+          in: query
+          description: 'Label to filter by. Labels which do not exist are ignored. If none of the provided labels exist, filtering is not applied. Example: `label={"group": "ee63e3ee43925bb5cc8cd17b817d93ee", "values": ["6706efc7828cd6aaedbc0434139cd3e1", "1f32651216cf2aefcaa08be1ea7dedf1"]}&label={"group": "126123b543912bb5cc12d17b817d9312", "values": ["aa63e3ee43925bb5cc8cd17b817d93aa", "df697bd824a944bf7d4fb6e350d9c5bd"]}`'
+          schema:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              properties:
+                group:
+                  type: string
+                  description: Identifier of the label group
+                  example: 2467e583a60e23fda2b89db81a453cd2
+                values:
+                  type: array
+                  description: List of identifiers of the label values
+                  items:
+                    type: string
+                    description: Identifier of the label value
+                    example: 71c378f3fee3d822759d1bdc2aab628c
+              required:
+                - group
+                - values
+          style: form
+          explode: true
+          examples:
+            single:
+              summary: Filter by a single label
+              value: ['{"group": "ee63e3ee43925bb5cc8cd17b817d93ee", "values": ["6706efc7828cd6aaedbc0434139cd3e1", "1f32651216cf2aefcaa08be1ea7dedf1"]}']
+            multiple:
+              summary: Filter by a multiple labels
+              value: ['{"group": "ee63e3ee43925bb5cc8cd17b817d93ee", "values": ["6706efc7828cd6aaedbc0434139cd3e1", "1f32651216cf2aefcaa08be1ea7dedf1"]}', '{"group": "126123b543912bb5cc12d17b817d9312", "values": ["aa63e3ee43925bb5cc8cd17b817d93aa", "df697bd824a944bf7d4fb6e350d9c5bd"]}']
+        - name: created_at__from
+          in: query
+          required: false
+          description: "Date and time, in ISO 8601 UTC format as lower limit to filter assets by `created_at`"
+          schema:
+            type: string
+            format: date-time
+          example: '2018-11-30T13:32:44Z'
+        - name: created_at__to
+          in: query
+          required: false
+          description: "Date and time, in ISO 8601 UTC format as upper limit to filter assets by `created_at`"
+          schema:
+            type: string
+            format: date-time
+          example: '2018-11-30T13:32:44Z'
+        - name: modified_at__from
+          in: query
+          required: false
+          description: "Date and time, in ISO 8601 UTC format as lower limit to filter assets by `modified_at`"
+          schema:
+            type: string
+            format: date-time
+          example: '2018-11-30T13:32:44Z'
+        - name: modified_at__to
+          in: query
+          required: false
+          description: "Date and time, in ISO 8601 UTC format as upper limit to filter assets by `modified_at`"
+          schema:
+            type: string
+            format: date-time
+          example: '2018-11-30T13:32:44Z'
+        - name: folder_id
+          in: query
+          required: false
+          description: ID of the Library folder to include assets from
+          schema:
+            type: string
+          example: 6bb8db20a5b611ebae319b7c541b1a7f
+        - name: include_subfolder_assets
+          in: query
+          required: false
+          description: Whether assets from sub folders need to be included or not
+          schema:
+            type: boolean
+            default: true
+          example: 'false'
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: List of fetched assets
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of assets
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssetResponse'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/assets?offset=10&page_size=10
+                required:
+                  - data
+                  - pagination
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Library
+      summary: POST /assets
+      description: Create a new asset. Supports only **images**, **videos** and **raw files**. _Procedure for uploading an asset are [discussed here](#section/Uploading-assets/Uploading-assets-(images-videos-and-raw-files)-to-Library-or-Task)_.
+      requestBody:
+        description: Payload to create an asset
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetRequest'
+      responses:
+        '201':
+          description: Created asset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /assets/{asset_id}/versions:
+    post:
+      tags:
+        - Library
+      summary: POST /assets/{asset_id}/versions
+      description: Add a new version to a library asset. Supports adding version to only **images**, **videos** and **raw files** type assets. _Procedure for uploading a version to a library asset are [discussed here](#section/Uploading-assets/Uploading-assets-(images-videos-and-raw-files)-to-Library-or-Task)_.
+      parameters:
+        - name: asset_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the asset
+          example: 5d7f910551b00a722e0418830cee6631
+      requestBody:
+        description: Payload to add a version to a library asset
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetRequest'
+      responses:
+        '201':
+          description: Created version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAssetVersionResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /articles/{id}:
+    get:
+      tags:
+        - Library
+      summary: GET /articles/{id}
+      description: Get an article
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the article
+          example: 5d7f910551b00a722e0418830cee6631
+
+      responses:
+        '200':
+          description: Fetched article
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryArticle'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /images/{id}:
+    get:
+      tags:
+        - Library
+      summary: GET /images/{id}
+      description: Get an image
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the image
+          example: 5d7f910551b00a722e0418830cee6632
+
+      responses:
+        '200':
+          description: Fetched image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryImage'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Library
+      summary: PATCH /images/{id}
+      description: Updates an image
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the image
+          example: 5d7f910551b00a722e0418830cee6631
+      requestBody:
+        description: Payload to update the image
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryImagePatchRequest'
+      responses:
+        '200':
+          description: Updated Image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryImage'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags:
+        - Library
+      summary: DELETE /images/{id}
+      description: Delete an image
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the image
+          example: 5d7f910551b00a722e0418830cee6632
+
+      responses:
+        '204':
+          description: Deleted the image
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /videos/{id}:
+    get:
+      tags:
+        - Library
+      summary: GET /videos/{id}
+      description: Get a video
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the video
+          example: 5d7f910551b00a722e0418830cee6633
+
+      responses:
+        '200':
+          description: Fetched video
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryVideo'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Library
+      summary: PATCH /videos/{id}
+      description: Updates a video
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the Video
+          example: 5d7f910551b00a722e0418830cee6631
+      requestBody:
+        description: Payload to update the video
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryVideoPatchRequest'
+      responses:
+        '200':
+          description: Video Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryVideo'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags:
+        - Library
+      summary: DELETE /videos/{id}
+      description: Delete a video
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the video
+          example: 5d7f910551b00a722e0418830cee6633
+
+      responses:
+        '204':
+          description: Deleted the video
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /raw-files/{id}:
+    get:
+      tags:
+        - Library
+      summary: GET /raw-files/{id}
+      description: Get a raw file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the raw file
+          example: 5d7f910551b00a722e0418830cee6634
+
+      responses:
+        '200':
+          description: Fetched raw file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryRawFile'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Library
+      summary: PATCH /raw-files/{id}
+      description: Updates a raw file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the Raw File
+          example: 5d7f910551b00a722e0418830cee6631
+      requestBody:
+        description: Payload to update the raw file
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryRawFilePatchRequest'
+      responses:
+        '200':
+          description: Raw File Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryRawFile'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags:
+        - Library
+      summary: DELETE /raw-files/{id}
+      description: Delete a raw file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the raw file
+          example: 5d7f910551b00a722e0418830cee6634
+
+      responses:
+        '200':
+          description: Deleted the raw file
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /label-groups:
+    get:
+      tags:
+        - Labels
+      summary: GET /label-groups
+      description: Get the list of label groups. Label groups are sorted by `name` in ascending order.
+      parameters:
+        - name: source_org_type
+          in: query
+          description: Source organization type to filter by
+          schema:
+            type: string
+            enum:
+              - current
+              - related
+          example: current
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: List of fetched label groups
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of label groups
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LabelGroup'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/label-groups?offset=10&page_size=10
+                required:
+                  - data
+                  - pagination
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /tasks/{id}:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{id}
+      description: Get a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+
+      responses:
+        '200':
+          description: Fetched task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Tasks
+      summary: PATCH /tasks/{id}
+      description: Update a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+      requestBody:
+        description: Payload to update the task
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskPatchRequest'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{id}/brief:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{id}/brief
+      description: Get brief of the task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+      responses:
+        '200':
+          description: Fetched brief of the task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskBriefResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{id}/custom-fields:
+    get:
+      tags:
+        - Tasks
+      summary: GET tasks/{id}/custom-fields
+      description: Get the list of custom fields added to a task.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: List of fetched custom fields
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of custom fields
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResourceCustomFieldResponse'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/custom-fields?offset=10&page_size=10
+                required:
+                  - data
+                  - pagination
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{task_id}/custom-fields/{custom_field_id}:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/custom-fields/{custom_field_id}
+      description: Get a custom field of a task
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - name: custom_field_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the custom field
+          example: 9nu8ue9wf8u9nusd9q
+      responses:
+        '200':
+          description: Fetched custom field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceCustomFieldResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Tasks
+      summary: PATCH /tasks/{task_id}/custom-fields/{custom_field_id}
+      description: |
+        Update a custom field of a task.
+        Currently supports update on the following types: `text_field`, `multi_line_text_field`, `checkboxes`, `dropdown`, `multiple_choice`, `date_field`, `rich_text_field`
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - name: custom_field_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the custom field
+          example: 9nu8ue9wf8u9nusd9q
+
+      requestBody:
+        description: |
+          Payload to update the custom field.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceCustomFieldRequest'
+
+      responses:
+        '200':
+          description: Updated custom field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceCustomFieldResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /tasks/{task_id}/custom-fields/{custom_field_id}/choices:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/custom-fields/{custom_field_id}/choices
+      description: Get the list of the choices of a custom field in a task.
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - name: custom_field_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the custom field
+          example: 9nu8ue9wf8u9nusd9q
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: List of fetched custom field choices
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of custom field choices
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResourceCustomFieldChoiceResponse'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/custom-fields/j90uv0sd9i0si09sdip/choices?offset=10&page_size=10
+                required:
+                  - data
+                  - pagination
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}
+      description: Get the sub step of a task
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+
+      responses:
+        '200':
+          description: Fetched task sub step information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubStep'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Tasks
+      summary: PATCH /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}
+      description: Update the sub step associated with an external work
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+
+      requestBody:
+        description: Payload to update the sub step associated with an external work
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskSubStepRequest'
+            examples:
+              is_completed:
+                summary: Mark the sub step as completed
+                value: {"is_completed": true}
+              assignee_id:
+                summary: Change assignee of the sub step
+                value: {"assignee_id": "5fdf31d57f0d0e362e2b5908"}
+
+      responses:
+        '200':
+          description: Fetched task sub step information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubStep'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/external-work:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/external-work
+      description: Get the external work information of a task external sub step
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+
+      responses:
+        '200':
+          description: Fetched external work information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskExternalWorkResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Tasks
+      summary: PATCH /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/external-work
+      description: Update the external work information of a task external sub step
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+
+      requestBody:
+        description: Payload to update the external work information
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskExternalWorkRequest'
+
+      responses:
+        '200':
+          description: Updated external work information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskExternalWorkResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/comments:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/comments
+      description: Get the list of the comments of a task sub step
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+      responses:
+        '200':
+          description: List of fetched task sub step comments
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of sub step comments
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskSubStepCommentResponse'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/tasks/7d7f910551b00a722e0418830cee6612/steps/897f910551b00a722e0418830cee6612/sub-steps/700f910551b00a722e0418830cee6612/comments?offset=10&page_size=10
+                required:
+                  - data
+                  - pagination
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Tasks
+      summary: POST /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/comments
+      description: Create a task sub step comment
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+
+      requestBody:
+        description: Payload to create sub step comment
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentPostRequest'
+
+      responses:
+        '201':
+          description: Created task sub step comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubStepCommentResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/comments/{comment_id}:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/comments/{comment_id}
+      description: Get a task sub step comment
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+        - name: comment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the comment
+          example: 5fe3886c574b52a62a089237
+      responses:
+        '200':
+          description: Fetched task sub step comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubStepCommentResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Tasks
+      summary: PATCH /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/comments/{comment_id}
+      description: Update a task sub step comment
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+        - name: comment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the comment
+          example: 5fe3886c574b52a62a089237
+
+      requestBody:
+        description: Payload to update the sub step comment
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskSubStepCommentPatchRequest'
+
+      responses:
+        '200':
+          description: Updated task sub step comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubStepCommentResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags:
+        - Tasks
+      summary: DELETE /tasks/{task_id}/steps/{step_id}/sub-steps/{sub_step_id}/comments/{comment_id}
+      description: Delete a task sub step comment
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the step
+          example: 897f910551b00a722e0418830cee6612
+        - name: sub_step_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the sub step
+          example: 700f910551b00a722e0418830cee6612
+        - name: comment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the comment
+          example: 5fe3886c574b52a62a089237
+
+      responses:
+        '204':
+          description: Deleted task sub step comment
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /tasks/{id}/assets:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{id}/assets
+      description: Get the list of the assets/contents of a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: List of fetched assets
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of assets
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskAssetResponse'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/assets?offset=10&page_size=10
+                required:
+                  - data
+                  - pagination
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Tasks
+      summary: POST /tasks/{id}/assets
+      description: Add a new asset to task. Supports only **images**, **videos** and **raw files**. _Procedure for uploading an asset are [discussed here](#section/Uploading-assets/Uploading-assets-(images-videos-and-raw-files)-to-Library-or-Task)_.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+      requestBody:
+        description: Payload to add an asset
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetRequest'
+      responses:
+        '201':
+          description: Created asset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAssetResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /tasks/{task_id}/assets/{asset_id}/drafts:
+    post:
+      tags:
+        - Tasks
+      summary: POST /tasks/{task_id}/assets/{asset_id}/drafts
+      description: Add a new draft to a task asset. Supports adding draft to only **images**, **videos** and **raw files** type task assets. _Procedure for uploading a draft to a task asset are [discussed here](#section/Uploading-assets/Uploading-assets-(images-videos-and-raw-files)-to-Library-or-Task)_.
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - name: asset_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the asset
+          example: 5d7f910551b00a722e0418830cee6631
+      requestBody:
+        description: Payload to add a draft to an asset
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetRequest'
+      responses:
+        '201':
+          description: Created draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAssetDraftResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /tasks/{task_id}/assets/{asset_id}/comments:
+    get:
+      tags:
+       - Tasks
+      summary: GET /tasks/{task_id}/assets/{asset_id}/comments
+      description: List all the comments for the latest version of a task asset.
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: asset_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the asset
+          example: 897f910551b00a722e0418830cee6612
+
+      responses:
+        '200':
+          description: List of comments for the asset
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of comments
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskAssetCommentResponse'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/tasks/7d7f910551b00a722e0418830cee6612/assets/897f910551b00a722e0418830cee6612/comments?offset=10&page_size=10
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Tasks
+      summary: POST /tasks/{task_id}/assets/{asset_id}/comments
+      description: Add a comment to the latest version of a task asset. Supports adding comments to only **images**, **videos** and **raw files** type assets.
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 7d7f910551b00a722e0418830cee6612
+        - name: asset_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the asset
+          example: 897f910551b00a722e0418830cee6612
+
+      requestBody:
+        description: Payload to add comment
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentPostRequest'
+
+      responses:
+        '201':
+          description: Added comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAssetCommentResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /tasks/{id}/attachments:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{id}/attachments
+      description: Get the list of the attachments of a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: List of fetched attachments
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    description: List of attachments
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AttachmentResponse'
+                  pagination:
+                    allOf:
+                      - $ref: '#/components/schemas/Pagination'
+                      - type: object
+                        properties:
+                          next:
+                            nullable: true
+                            example: https://api.welcomesoftware.com/v3/tasks/attachments?offset=10&page_size=10
+                required:
+                  - data
+                  - pagination
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{task_id}/articles/{article_id}:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/articles/{article_id}
+      description: Get an article associated with the task identified by task_id
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - name: article_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the article associated with the task
+          example: 5d7f910551b00a722e0418830cee6631
+      responses:
+        '200':
+          description: Fetched article
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskArticle'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{task_id}/images/{image_id}:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/images/{image_id}
+      description: Get an image associated with the task identified by task_id
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - name: image_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the image associated with the task
+          example: 5d7f910551b00a722e0418830cee6632
+      responses:
+        '200':
+          description: Fetched image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskImage'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{task_id}/videos/{video_id}:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/videos/{video_id}
+      description: Get a video associated with the task identified by task_id
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the video associated with the task
+          example: 5d7f910551b00a722e0418830cee6633
+      responses:
+        '200':
+          description: Fetched video
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskVideo'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{task_id}/raw-files/{raw_file_id}:
+    get:
+      tags:
+        - Tasks
+      summary: GET /tasks/{task_id}/raw-files/{raw_file_id}
+      description: Get a raw file associated with the task identified by task_id
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the task
+          example: 5f857f30e1c4a2038d6179e9
+        - name: raw_file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the raw file associated with the task
+          example: 5d7f910551b00a722e0418830cee6634
+      responses:
+        '200':
+          description: Fetched raw file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskRawFile'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /campaigns/{id}:
+    get:
+      tags:
+        - Campaigns
+      summary: GET /campaigns/{id}
+      description: Get a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the campaign
+          example: 8q7f910551b00a722e0418830cee6612
+
+      responses:
+        '200':
+          description: Fetched campaign
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: GET /users
+      description: Find a user by email address
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Email address of the user
+          example: john.doe@example.com
+
+      responses:
+        '302':
+          description: Redirect to the discovered user
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the discovered user
+              example: https://api.welcomesoftware.com/v3/users/5fe4925ef8a9378056bf4e37
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: GET /users/{id}
+      description: Get a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the user
+          example: 5fe4925ef8a9378056bf4e37
+
+      responses:
+        '200':
+          description: Fetched user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /settings:
+    get:
+      tags:
+        - Settings
+      summary: GET /settings
+      description: Get settings
+      
+      responses:
+        '200':
+          description: Fetched settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingResource'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Settings
+      summary: POST /settings
+      description: Create or update settings
+      parameters:
+        - name: execute
+          in: query
+          required: false
+          description: if `execute=true` the settings will be created/updated otherwise the endpoint will only return the changeset 
+          schema:
+            type: boolean
+          example: true
+        - name: overwrite_workflows
+          in: query
+          required: false
+          description: if `overwrite_workflows=true` the existing workflows will be overwritten otherwise a new workflow will be created where prefix `Copy of` will be added with the name of the workflow.
+          schema:
+            type: boolean
+          example: true
+        
+      requestBody:
+        description: Payload to create or update settings
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingResource'
+      responses:
+        '200':
+          description: Created or Updated settings and changeset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingPostResource'
+        '400':
+          $ref: '#/components/responses/ClientError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+
+  responses:
+    ClientError:
+      description: Client error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: 'Unsupported arguments: a,b,c'
+
+    Unauthorized:
+      description: Authorization error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Unauthorized
+
+    Forbidden:
+      description: Permission error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: User does not have the permission to perform this operation
+
+    NotFound:
+      description: Not found error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Resource not found
+
+    UnprocessableEntity:
+      description: Unprocessable entity error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Resource is unprocessable
+
+  schemas:
+    TaskPatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        labels:
+          type: array
+          nullable: false
+          description: Labels to associate
+          items:
+            $ref: '#/components/schemas/ResourceLabelRequest'
+
+    AssetRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          maxLength: 100
+          description: Unique identifier of the file upload session. This is the `upload_meta_fields.key` field which was retrieved from the `/v3/upload-url` endpoint
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Title of the asset
+          example: sample_image.png
+        # file_location:
+        #   type: string
+        #   maxLength: 500
+        #   description: Folder location of the asset in Library
+        #   example: /all assets/important assets
+        # labels:
+        #   type: array
+        #   description: Labels to be associated to the asset
+        #   items:
+        #     $ref: '#/components/schemas/ResourceLabelRequest'
+      required:
+        - key
+        - title
+        # - file_location
+        # - labels
+
+    AssetResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the asset
+          example: 5d7f910551b00a722e0418830cee6631
+        title:
+          type: string
+          description: Title of the asset
+          example: sample_image.png
+        type:
+          type: string
+          enum:
+            - article
+            - image
+            - video
+            - raw_file
+          description: Type of the asset
+          example: image
+        mime_type:
+          type: string
+          description: MIME type of the asset
+          example: image/png
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the asset has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the asset (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        folder_id:
+          type: string
+          nullable: true
+          description: ID of the folder containing the asset in Library
+          example: 6bb8db20a5b611ebae319b7c541b1a5a
+        file_location:
+          type: string
+          description: Location of the folder containing the asset in Library
+          example: /all assets/important assets
+        content:
+          $ref: '#/components/schemas/AssetContent'
+        labels:
+          type: array
+          description: Labels associated to the asset
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the asset, currently only GET is supported
+              example: https://api.welcomesoftware.com/v3/images/5d7f910551bw0a722e0418830cee6631
+          required:
+            - self
+        owner_organization_id:
+          type: string
+          nullable: false
+          description: ID of the asset's owner organization
+          example: 5108c3a9becac35915111191
+      required:
+        - id
+        - title
+        - type
+        - mime_type
+        - created_at
+        - modified_at
+        - folder_id
+        - file_location
+        - content
+        - labels
+        - links
+        - owner_organization_id
+
+    LibraryAssetVersionResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        version_number:
+          type: integer
+          description: The serial number of the version
+          example: 2
+        asset_id:
+          type: string
+          description: Unique identifier of the asset
+          example: 5d7f910551b00a722e0418830cee6631
+        title:
+          type: string
+          description: Title of the asset
+          example: sample_image.png
+        type:
+          type: string
+          enum:
+            - image
+            - video
+            - raw_file
+          description: Type of the version
+          example: image
+        mime_type:
+          type: string
+          description: MIME type of the version
+          example: image/png
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the version has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        content:
+          description: Content of the version
+          type: object
+          additionalProperties: false
+          properties:
+            type:
+              type: string
+              description: Type of the content
+              enum:
+                - url
+              example: url
+            value:
+              type: string
+              description: Content of the version. For image, raw file and video it is the download URL
+              example: http://images.welcomesoftware.com/Zz0xODQ3NDU3Y2Y2YmYzOTlmNjkyOTgyZDY3Y2I3YWM2OA==S
+          required:
+            - type
+            - value
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            asset:
+              type: string
+              description: URL of the asset that the version is associated with
+              example: https://api.welcomesoftware.com/v3/images/5d7f910551b00a722e0418830cee6631
+          required:
+            - asset
+      required:
+        - version_number
+        - asset_id
+        - title
+        - type
+        - mime_type
+        - created_at
+        - content
+        - links
+
+    LibraryImagePatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          nullable: false
+          description: Title of the image
+          example: cat.jpeg
+        is_public:
+          type: boolean
+          nullable: false
+          description: Whether the image url should be public or not
+          example: true
+        labels:
+          type: array
+          nullable: false
+          description: Labels to associate with the image
+          items:
+            $ref: '#/components/schemas/ResourceLabelRequest'
+
+    LibraryVideoPatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          nullable: false
+          description: Title of the video
+          example: product.mp4
+        is_public:
+          type: boolean
+          nullable: false
+          description: Whether the video url should be public or not
+          example: true
+        labels:
+          type: array
+          nullable: false
+          description: Labels to associate with the video
+          items:
+            $ref: '#/components/schemas/ResourceLabelRequest'
+
+    LibraryRawFilePatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          nullable: false
+          description: Title of the raw file
+          example: documents.zip
+        is_public:
+          type: boolean
+          nullable: false
+          description: Whether the raw file url should be public or not
+          example: true
+        labels:
+          type: array
+          nullable: false
+          description: Labels to associate with the raw file
+          items:
+            $ref: '#/components/schemas/ResourceLabelRequest'
+
+
+    AttachmentRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Unique identifier of the file upload session. This is the `upload_meta_fields.key` field which was retrieved from the `/v3/upload-url` endpoint
+          example: ce8995aea58b11ea8cd90242ac120005
+        name:
+          type: string
+          minLength: 1
+          description: Filename of the attachment
+          example: sample_image.png
+      required:
+        - key
+        - name
+
+    AttachmentResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the attachment
+          example: 5a7f910511b0a72230ce6631
+        name:
+          type: string
+          description: Filename of the attachment
+          example: sample_image.png
+        url:
+          type: string
+          description: Download URL of the attachment
+          example: https://files.welcomesoftware.com/download/2115bfe4450c11ebaae8000c291b51d4
+      required:
+        - id
+        - name
+        - url
+
+    TaskAssetResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the asset
+          example: 5d7f910551b00a722e0418830cee6631
+        title:
+          type: string
+          description: Title of the asset
+          example: sample_image.png
+        type:
+          type: string
+          enum:
+            - article
+            - image
+            - video
+            - raw_file
+          description: Type of the asset
+          example: image
+        mime_type:
+          type: string
+          description: MIME type of the asset
+          example: image/png
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the asset has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the asset (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        content:
+          $ref: '#/components/schemas/AssetContent'
+        labels:
+          type: array
+          description: Labels associated to the asset
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the asset
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/image/5d7f910551b00a722e0418830cee6631
+            task:
+              type: string
+              description: URL of the task that the asset is associated with
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9
+            drafts:
+              type: string
+              nullable: true
+              description: URL to POST draft to the asset, always null for **article**, non null for **image**, **video** and **raw file**.
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/assets/5d7f910551b00a722e0418830cee6631/drafts
+            web_urls:
+              type: object
+              additionalProperties: false
+              description: Web URLs
+              properties:
+                self:
+                  type: string
+                  description: Web URL of the asset
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9?contentTabGuid=5d7f910551b00a722e0418830cee6631
+                task:
+                  type: string
+                  description: Web URL of the task that the asset is associated with
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9
+                drafts:
+                  type: string
+                  nullable: true
+                  description: Web URL of the drafts of the asset, always null for **article**, non null for **image**, **video** and **raw file**.
+                  example: https://app.welcomesoftware.com/cloud/task/5f857f30e1c4a2038d6179e9/image/5d7f910551b00a722e0418830cee6631
+              required:
+                - self
+                - task
+                - drafts
+          required:
+            - self
+            - task
+            - drafts
+            - web_urls
+      required:
+        - id
+        - title
+        - type
+        - mime_type
+        - created_at
+        - modified_at
+        - content
+        - labels
+        - links
+
+    TaskAssetDraftResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        draft_number:
+          type: integer
+          description: The serial number of the draft
+          example: 2
+        asset_id:
+          type: string
+          description: Unique identifier of the asset
+          example: 5d7f910551b00a722e0418830cee6631
+        title:
+          type: string
+          description: Title of the draft
+          example: sample_image.png
+        type:
+          type: string
+          enum:
+            - image
+            - video
+            - raw_file
+          description: Type of the draft
+          example: image
+        mime_type:
+          type: string
+          description: MIME type of the draft
+          example: image/png
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the draft has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        content:
+          description: Content of the draft
+          type: object
+          additionalProperties: false
+          properties:
+            type:
+              type: string
+              description: Type of the content
+              enum:
+                - url
+              example: url
+            value:
+              type: string
+              description: Content of the draft. For image, raw file and video it is the download URL
+              example: http://images.welcomesoftware.com/Zz0xODQ3NDU3Y2Y2YmYzOTlmNjkyOTgyZDY3Y2I3YWM2OA==S
+          required:
+            - type
+            - value
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            asset:
+              type: string
+              description: URL of the asset that the draft is associated with
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/images/5d7f910551b00a722e0418830cee6631
+            task:
+              type: string
+              description: URL of the task that the asset is associated with
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9
+          required:
+            - asset
+            - task
+      required:
+        - draft_number
+        - asset_id
+        - title
+        - type
+        - mime_type
+        - created_at
+        - content
+        - links
+
+    LibraryArticle:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the article
+          example: 5d7f910551b00a722e0418830cee6631
+        title:
+          type: string
+          description: Title of the article
+          example: 3 Ways Influencer Marketing Will Further Mature in 2020
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the article has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the article (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        html_body:
+          type: string
+          description: Content of the article
+          example: <p>Article text</p>
+        folder_id:
+          type: string
+          nullable: true
+          description: ID of the folder containing the article in Library
+          example: 6bb8db20a5b611ebae319b7c541b1a5a
+        file_location:
+          type: string
+          description: Location of the folder containing the article in Library
+          example: /all assets/
+        labels:
+          type: array
+          description: Labels associated to the article
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        group_id:
+          type: string
+          nullable: true
+          description: Unique identifier of the source article in case of copied or translated articles
+          example: 7949c82ce3ae11eba378dbacdf18f20c
+        meta_title:
+          type: string
+          nullable: true
+          description: Meta title of the article
+          example: 3 Ways Influencer Marketing Will Further Mature in 2020
+        meta_description:
+          type: string
+          nullable: true
+          description: Meta description of the article
+          example: Article text
+        meta_url:
+          type: string
+          nullable: true
+          description: Meta url of the article
+          example: /
+        meta_keywords:
+          type: array
+          description: Meta Keywords of the article
+          items:
+            type: string
+          example: ['key', 'word', 'keyword']
+        source_article:
+          type: string
+          nullable: true
+          description: Link to the vendor article for Marketplace article or Task article ID for created article
+          example: https://source-vendor.com/sample-article
+        url:
+          type: string
+          nullable: true
+          description: Link to the published article
+          example: https://welcomesoftware.com/sample-article
+        authors:
+          type: array
+          description: List of authors of the article
+          items:
+            $ref: '#/components/schemas/ArticleAuthorResponse'
+        lang_code:
+          type: string
+          nullable: true
+          description: Language code depicting language of the article
+          example: eng
+        pixel_key:
+          type: string
+          description: Unique tracking pixel of the article
+          example: https://pixel.welcomesoftware.com/px.gif?key=YXJ0aWNsZT0zZmJjN2Y5NmUzYzcxMWViOGVmNTAyNDJhYzEyMDAxOA==
+        images:
+          type: array
+          description: Featured images of the article
+          items:
+            $ref: '#/components/schemas/FeaturedImageResponse'
+        owner_organization_id:
+          type: string
+          nullable: false
+          description: ID of owner organization of the article
+          example: 5108c3a9becac35915111191
+      required:
+        - id
+        - title
+        - created_at
+        - modified_at
+        - html_body
+        - folder_id
+        - url
+        - file_location
+        - labels
+        - group_id
+        - meta_title
+        - meta_description
+        - meta_url
+        - meta_keywords
+        - source_article
+        - authors
+        - lang_code
+        - pixel_key
+        - images
+        - owner_organization_id
+
+    TaskArticle:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the article
+          example: 5d7f910551b00a722e0418830cee6631
+        title:
+          type: string
+          description: Title of the article
+          example: 3 Ways Influencer Marketing Will Further Mature in 2020
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the article has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the article (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        html_body:
+          type: string
+          description: Content of the article
+          example: <p>Article text</p>
+        url:
+          type: string
+          nullable: true
+          description: Public URL of the article
+          example: https://welcomesoftware.com/new-article-published.html
+        labels:
+          type: array
+          description: Labels associated to the article
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the article
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/articles/5d7f910551b00a722e0418830cee6631
+            task:
+              type: string
+              description: URL of the task that the article is associated with
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9
+            drafts:
+              type: string
+              nullable: true
+              description: URL to POST draft to a task asset, currently not supported for **article**, hence the value will always be `null`
+              example: null
+            web_urls:
+              type: object
+              additionalProperties: false
+              description: Web URLs
+              properties:
+                self:
+                  type: string
+                  description: Web URL of the article
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9?contentTabGuid=5d7f910551b00a722e0418830cee6631
+                task:
+                  type: string
+                  description: Web URL of the task that the article is associated with
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9
+                drafts:
+                  type: string
+                  nullable: true
+                  description: Web URL of the drafts of the article, currently not supported for **article**, hence the value will always be `null`
+                  example: null
+              required:
+                - self
+                - task
+                - drafts
+          required:
+            - self
+            - task
+            - drafts
+            - web_urls
+      required:
+        - id
+        - title
+        - created_at
+        - modified_at
+        - html_body
+        - url
+        - labels
+        - links
+
+    LibraryImage:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the image
+          example: 5d7f910551b00a722e0418830cee6632
+        title:
+          type: string
+          description: Title of the image
+          example: cat.jpeg
+        description:
+          type: string
+          nullable: true
+          description: Description of the image
+          example: Very important image
+        mime_type:
+          type: string
+          description: MIME type of the image
+          example: image/jpeg
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the image has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the image (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        file_size:
+          type: integer
+          description: Size of the image in bytes
+          example: 11244
+        image_resolution:
+          type: object
+          additionalProperties: false
+          description: Width and height of the image in pixels
+          properties:
+            height:
+              type: integer
+              description: Height of the image in pixels
+              example: 800
+            width:
+              type: integer
+              description: Width of the image in pixels
+              example: 700
+          required:
+            - height
+            - width
+        folder_id:
+          type: string
+          nullable: true
+          description: ID of the folder containing the image in Library
+          example: 6bb8db20a5b611ebae319b7c541b1a5a
+        file_location:
+          type: string
+          description: Location of the folder containing the image in Library
+          example: /images/
+        is_public:
+          type: boolean
+          description: Whether the image url is public or not
+          example: true
+        url:
+          type: string
+          description: Download URL of the image
+          example: http://images.welcomesoftware.com/Zz0xODQ3NDU3Y2Y2YmYzOTlmNjkyOTgyZDY3Y2I3YWM2OA==
+        labels:
+          type: array
+          description: Labels associated to the image
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        owner_organization_id:
+          type: string
+          nullable: false
+          description: ID of owner organization of the image
+          example: 5108c3a9becac35915111191
+      required:
+        - id
+        - title
+        - description
+        - mime_type
+        - created_at
+        - modified_at
+        - file_size
+        - image_resolution
+        - folder_id
+        - file_location
+        - is_public
+        - url
+        - labels
+        - owner_organization_id
+
+    FeaturedImageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        attribution_text:
+          type: string
+          nullable: true
+          description: Attribution text of the featured image
+          example: This is a sample attribution text
+        caption:
+          type: string
+          description: Caption of the featured image
+          example: This is a sample caption
+        description:
+          type: string
+          nullable: true
+          description: Description of the featured image
+          example: This is a sample description
+        mime_type:
+          type: string
+          description: MIME type of the featured image
+          example: image/jpeg
+        source:
+          type: object
+          description: Source of the featured image
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              nullable: true
+              description: Organization or vendor name of the featured image
+              example: Reuters
+          required:
+            - name
+        url:
+          type: string
+          description: URL of the featured image
+          example: https://images-cdn.welcomesoftware.com/sample.jpeg
+        height:
+          type: integer
+          description: Height of the featured image in pixels
+          example: 400
+        width:
+          type: integer
+          description: Width of the featured image in pixels
+          example: 700
+        thumbnail:
+          type: string
+          nullable: true
+          description: URL of the featured image thumbnail
+          example: https://images-cdn.welcomesoftware.com/Zz01Y2FkOWFjZWQ5OTMxMWViYjY3OTEzNDMzOWM3ZDNhNA==?width=75&height=75
+
+      required:
+        - attribution_text
+        - caption
+        - description
+        - mime_type
+        - source
+        - height
+        - width
+        - thumbnail
+        - url
+
+    ArticleAuthorResponse:
+      description: Author of the article
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          nullable: true
+          description: Name of Author
+          example: John Doe
+      required:
+        - name
+
+    TaskImage:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the image
+          example: 5d7f910551b00a722e0418830cee6632
+        title:
+          type: string
+          description: Title of the image
+          example: cat.jpeg
+        mime_type:
+          type: string
+          description: MIME type of the image
+          example: image/jpeg
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the image has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the image (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        file_size:
+          type: integer
+          description: Size of the image in bytes
+          example: 11244
+        image_resolution:
+          type: object
+          additionalProperties: false
+          description: Width and height of the image in pixels
+          properties:
+            height:
+              type: integer
+              description: Height of the image in pixels
+              example: 800
+            width:
+              type: integer
+              description: Width of the image in pixels
+              example: 700
+          required:
+            - height
+            - width
+        url:
+          type: string
+          description: Download URL of the image
+          example: http://images.welcomesoftware.com/Zz0xODQ3NDU3Y2Y2YmYzOTlmNjkyOTgyZDY3Y2I3YWM2OA==
+        labels:
+          type: array
+          description: Labels associated to the image
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the image
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/images/5d7f910551b00a722e0418830cee6632
+            task:
+              type: string
+              description: URL of the task that the image is associated with
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9
+            drafts:
+              type: string
+              description: URL to POST draft to the image
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/assets/5d7f910551b00a722e0418830cee6632/drafts
+            web_urls:
+              type: object
+              additionalProperties: false
+              description: Web URLs
+              properties:
+                self:
+                  type: string
+                  description: Web URL of the image
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9?contentTabGuid=5d7f910551b00a722e0418830cee6632
+                task:
+                  type: string
+                  description: Web URL of the task that the image is associated with
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9
+                drafts:
+                  type: string
+                  description: Web URL of the drafts of the image
+                  example: https://app.welcomesoftware.com/cloud/task/5f857f30e1c4a2038d6179e9/image/5d7f910551b00a722e0418830cee6632
+              required:
+                - self
+                - task
+                - drafts
+          required:
+            - self
+            - task
+            - drafts
+            - web_urls
+      required:
+        - id
+        - title
+        - mime_type
+        - created_at
+        - modified_at
+        - file_size
+        - image_resolution
+        - url
+        - labels
+        - links
+
+    LibraryVideo:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the video
+          example: 5d7f910551b00a722e0418830cee6633
+        title:
+          type: string
+          description: Title of the video
+          example: product.mp4
+        description:
+          type: string
+          nullable: true
+          description: Description of the video
+          example: Very important video
+        mime_type:
+          type: string
+          description: MIME type of the video
+          example: video/mp4
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the video has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the video (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        file_size:
+          type: integer
+          description: Size of the video in bytes
+          example: 11244
+        folder_id:
+          type: string
+          nullable: true
+          description: ID of the folder containing the video in Library
+          example: 6bb8db20a5b611ebae319b7c541b1a5a
+        file_location:
+          type: string
+          description: Location of the folder containing the video in Library
+          example: /example/
+        is_public:
+          type: boolean
+          description: Whether the video url is public or not
+          example: true
+        url:
+          type: string
+          description: Download url of the video
+          example: https://s3.amazonaws.com/videos.welcomesoftware.com/03a747babe81ceb55763fa085bqa20dc
+        labels:
+          type: array
+          description: Labels associated to the video
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        owner_organization_id:
+          type: string
+          nullable: false
+          description: ID of owner organization of the video
+          example: 5108c3a9becac35915111191
+      required:
+        - id
+        - title
+        - description
+        - mime_type
+        - created_at
+        - modified_at
+        - file_size
+        - folder_id
+        - file_location
+        - is_public
+        - url
+        - labels
+        - owner_organization_id
+
+    TaskVideo:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the video
+          example: 5d7f910551b00a722e0418830cee6633
+        title:
+          type: string
+          description: Title of the video
+          example: product.mp4
+        mime_type:
+          type: string
+          description: MIME type of the video
+          example: video/mp4
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the video has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the video (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        file_size:
+          type: integer
+          description: Size of the video in bytes
+          example: 11244
+        url:
+          type: string
+          description: Download url of the video
+          example: https://s3.amazonaws.com/videos.welcomesoftware.com/03a747babe81ceb55763fa085bqa20dc
+        labels:
+          type: array
+          description: Labels associated to the video
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the video
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/videos/5d7f910551b00a722e0418830cee6633
+            task:
+              type: string
+              description: URL of the task that the video is associated with
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9
+            drafts:
+              type: string
+              description: URL to POST draft to the video
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/assets/5d7f910551b00a722e0418830cee6633/drafts
+            web_urls:
+              type: object
+              additionalProperties: false
+              description: Web URLs
+              properties:
+                self:
+                  type: string
+                  description: Web URL of the video
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9?contentTabGuid=5d7f910551b00a722e0418830cee6633
+                task:
+                  type: string
+                  description: Web URL of the task that the video is associated with
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9
+                drafts:
+                  type: string
+                  description: Web URL of the drafts of the video
+                  example: https://app.welcomesoftware.com/cloud/task/5f857f30e1c4a2038d6179e9/video/5d7f910551b00a722e0418830cee6633
+              required:
+                - self
+                - task
+                - drafts
+          required:
+            - self
+            - task
+            - drafts
+            - web_urls
+      required:
+        - id
+        - title
+        - mime_type
+        - created_at
+        - modified_at
+        - file_size
+        - url
+        - labels
+        - links
+
+    LibraryRawFile:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the raw file
+          example: 5d7f910551b00a722e0418830cee6634
+        title:
+          type: string
+          description: Title of the raw file
+          example: documents.zip
+        description:
+          type: string
+          nullable: true
+          description: Description of the raw file
+          example: Very important file
+        mime_type:
+          type: string
+          description: MIME type of the raw file
+          example: application/zip
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the raw file has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the raw file (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        file_size:
+          type: integer
+          description: Size of the raw file in bytes
+          example: 11244
+        folder_id:
+          type: string
+          nullable: true
+          description: ID of the folder containing the raw file in Library
+          example: 6bb8db20a5b611ebae319b7c541b1a5a
+        file_location:
+          type: string
+          description: Location of the folder containing the raw file in Library
+          example: /all files/
+        is_public:
+          type: boolean
+          description: Whether the raw file url is public or not
+          example: true
+        url:
+          type: string
+          description: Download url of the raw file
+          example: https://s3.amazonaws.com/files.welcomesoftware.com/171451644651701b96f1122009f026bc
+        labels:
+          type: array
+          description: Labels associated to the raw file
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        owner_organization_id:
+          type: string
+          nullable: false
+          description: ID of owner organization of the raw file
+          example: 5108c3a9becac35915111191
+      required:
+        - id
+        - title
+        - description
+        - mime_type
+        - created_at
+        - modified_at
+        - file_size
+        - folder_id
+        - file_location
+        - is_public
+        - url
+        - labels
+        - owner_organization_id
+
+    TaskRawFile:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the raw file
+          example: 5d7f910551b00a722e0418830cee6634
+        title:
+          type: string
+          description: Title of the raw file
+          example: documents.zip
+        mime_type:
+          type: string
+          description: MIME type of the raw file
+          example: application/zip
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the raw file has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the raw file (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        file_size:
+          type: integer
+          description: Size of the raw file in bytes
+          example: 11244
+        url:
+          type: string
+          description: Download url of the raw file
+          example: https://s3.amazonaws.com/files.welcomesoftware.com/171451644651701b96f1122009f026bc
+        labels:
+          type: array
+          description: Labels associated to the raw file
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the raw file
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/raw-files/5d7f910551b00a722e0418830cee6634
+            task:
+              type: string
+              description: URL of the task that the raw file is associated with
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9
+            drafts:
+              type: string
+              description: URL to POST draft to the raw file
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/assets/5d7f910551b00a722e0418830cee6634/drafts
+            web_urls:
+              type: object
+              additionalProperties: false
+              description: Web URLs
+              properties:
+                self:
+                  type: string
+                  description: Web URL of the raw file
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9?contentTabGuid=5d7f910551b00a722e0418830cee6634
+                task:
+                  type: string
+                  description: Web URL of the task that the raw file is associated with
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5f857f30e1c4a2038d6179e9
+                drafts:
+                  type: string
+                  description: Web URL of the drafts of the raw file
+                  example: https://app.welcomesoftware.com/cloud/task/5f857f30e1c4a2038d6179e9/raw_file/5d7f910551b00a722e0418830cee6634
+              required:
+                - self
+                - task
+                - drafts
+          required:
+            - self
+            - task
+            - drafts
+            - web_urls
+      required:
+        - id
+        - title
+        - mime_type
+        - created_at
+        - modified_at
+        - file_size
+        - url
+        - labels
+        - links
+
+    AssetContent:
+      description: Content of the asset
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          description: Type of the content. For article it is `html_body` and for image, raw file and video it is `url`
+          enum:
+            - url
+            - html_body
+          example: url
+        value:
+          type: string
+          description: Content of the asset. For article it is the html body and for image, raw file and video it is the download URL
+          example: http://images.welcomesoftware.com/Zz0xODQ3NDU3Y2Y2YmYzOTlmNjkyOTgyZDY3Y2I3YWM2OA==S
+      required:
+        - type
+        - value
+
+    ResourceLabelRequest:
+      description: Payload to associate labels to a resource
+      type: object
+      additionalProperties: false
+      properties:
+        group:
+          description: Label group
+          type: string
+          minLength: 32
+          maxLength: 32
+          example: 2467e583a60e23fda2b89db81a453cd2
+        values:
+          type: array
+          description: List of values of the label
+          items:
+            type: string
+            minLength: 32
+            maxLength: 32
+            example: 71c378f3fee3d822759d1bdc2aab628c
+      required:
+        - group
+        - values
+
+    ResourceLabelResponse:
+      description: Label associated to a fetched resource
+      type: object
+      additionalProperties: false
+      properties:
+        group:
+          description: Label group
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              description: Identifier of the label group
+              example: 2467e583a60e23fda2b89db81a453cd2
+            name:
+              type: string
+              description: Name of the label group
+              example: Content Format
+          required:
+            - id
+            - name
+        values:
+          type: array
+          description: List of values of the label
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+                description: Identifier of the label value
+                example: 71c378f3fee3d822759d1bdc2aab628c
+              name:
+                type: string
+                description: Name of the label value
+                example: Photos
+            required:
+              - id
+              - name
+      required:
+        - group
+        - values
+
+    LabelGroup:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the label group
+          example: 693c3b28b10a22800e1936fa53324ac1
+        name:
+          type: string
+          description: Name of the label group
+          example: Content Pillar
+        source_org_type:
+          type: string
+          enum:
+            - current
+            - related
+          description: |
+            Source organization type where the label group is listed.
+            `current` means the label group is listed in the organization with which the Open API App is associated.
+            `related` means the label group is listed in one of the organizations related to the `current` organization.
+        values:
+          description: Values of the label group
+          type: array
+          items:
+            $ref: '#/components/schemas/LabelGroupValue'
+      required:
+        - id
+        - name
+        - source_org_type
+        - values
+
+    LabelGroupValue:
+      type: object
+      additionalProperties: false
+      description: Values of a label group
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the label group value
+          example: 1693bd22eac001bae8f33eab29ee5bc2
+        name:
+          type: string
+          description: Name of the label group value
+          example: Pillar 1
+      required:
+        - id
+        - name
+
+    FolderResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the folder
+          example: 5d7f910551b00a722e0418830cee6632
+        name:
+          type: string
+          description: Name of the folder
+          example: icons
+        parent_folder_id:
+          type: string
+          nullable: true
+          description: ID of the parent of the folder
+          example: 1d9d8aeca10811ebbc640242ac12001b
+        path:
+          type: string
+          description: Folder location
+          example: /images/icons
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, on which the folder has been created (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Date and time, in ISO 8601 UTC format, of the most recent modification of the folder (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-07T13:15:30Z'
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the folder
+              example: https://api.welcomesoftware.com/v3/folders/5d7f910551b00a722e0418830cee6632
+            parent_folder:
+              type: string
+              nullable: true
+              description: URL of the parent of the folder
+              example: https://api.welcomesoftware.com/v3/folders/1d9d8aeca10811ebbc640242ac12001b
+            child_folders:
+              type: string
+              description: URL of the children list of the folder
+              example: https://api.welcomesoftware.com/v3/folders?parent_folder_id=5d7f910551b00a722e0418830cee6632
+            assets:
+              type: string
+              description: URL of the assets inside the folder
+              example: https://api.welcomesoftware.com/v3/assets?folder_id=5d7f910551b00a722e0418830cee6632&include_subfolder_assets=false
+          required:
+            - self
+            - parent_folder
+            - child_folders
+            - assets
+      required:
+        - id
+        - name
+        - parent_folder_id
+        - path
+        - created_at
+        - modified_at
+        - links
+
+    TaskBriefTemplateValue:
+      type: object
+      description: Template info of the brief if the brief is of template type
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the template
+          example: 9nu8ue9wf8u9nusd9f
+        name:
+          type: string
+          description: Name of the template
+          example: My Template
+      required:
+        - id
+        - name
+
+    NullValue:
+      # Allow null values.
+      nullable: true
+      # Disallow any non-null value.
+      not:
+        anyOf:
+          - type: string
+          - type: number
+          - type: boolean
+          - type: object
+          - type: array
+            # Array schema must specify items, so we'll use an
+            # empty object to mean arrays of any type are included.
+            items: { }
+
+    TaskBriefResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          description: Type of the task brief
+          example: template
+          enum:
+            - template
+            - attachment
+            - text
+        template:
+          # A workaround for the issue: https://github.com/OAI/OpenAPI-Specification/issues/1368
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/NullValue'
+            - $ref: '#/components/schemas/TaskBriefTemplateValue'
+        fields:
+          description: List of fields of the brief
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              name:
+                type: string
+                description: Name of the brief field
+                example: My Dropdown
+              value:
+                type: array
+                description: List of values set for the brief field
+                items:
+                  type: string
+                  description: value set in the brief field
+                  example: option 1
+            required:
+              - name
+              - value
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the brief
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/brief
+            task:
+              type: string
+              description: URL of the task
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9
+          required:
+            - self
+            - task
+      required:
+        - type
+        - fields
+        - links
+
+    TaskExternalWorkResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        identifier:
+          type: string
+          nullable: true
+          description: Identifier of the external work
+          example: MY-PROJ-123
+        title:
+          type: string
+          nullable: true
+          description: Title of the external work
+          example: A very important ticket
+        status:
+          type: string
+          nullable: true
+          description: Status of the external work
+          example: In Progress
+        url:
+          type: string
+          nullable: true
+          description: Link to the external work
+          example: https://example.com/some-project/MY-PROJ-123
+        external_system:
+          type: string
+          description: Name of the external system
+          example: jira
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL to get or update the external work information
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee6631/steps/32982hf94j98cnr48034nv035/sub-steps/9n390809r384nv503459075034nv5/external-work
+          required:
+            - self
+      required:
+        - identifier
+        - title
+        - status
+        - url
+        - external_system
+        - links
+
+    TaskExternalWorkRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 50
+          nullable: true
+          description: Identifier of the external work
+          example: MY-PROJ-123
+        title:
+          type: string
+          minLength: 1
+          maxLength: 128
+          nullable: true
+          description: Title of the external work
+          example: A very important ticket
+        status:
+          type: string
+          minLength: 1
+          maxLength: 50
+          nullable: true
+          description: Status of the external work
+          example: In Progress
+        url:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Link to the external work (must be a valid URL with HTTPS scheme)
+          example: https://example.com/some-project/MY-PROJ-123
+
+    ResourceCustomFieldResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the custom field
+          example: 9nu8ue9wf8u9nusd9q
+        name:
+          type: string
+          description: Name of the custom field
+          example: My Dropdown
+        type:
+          type: string
+          description: Type of the custom field
+          example: dropdown
+          enum:
+            - text_field
+            - multi_line_text_field
+            - checkboxes
+            - dropdown
+            - multiple_choice
+            - date_field
+            - image
+            - video
+            - rich_text_field
+        values:
+          type: array
+          description: List of values of the custom field
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+                nullable: true
+                description: Identifier of the custom field value
+                example: 1nu8ue9wf8u9nusd9u
+              name:
+                type: string
+                description: Name of the custom field value
+                example: Some text
+            required:
+              - id
+              - name
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the custom field
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/custom-fields/9nu8ue9wf8u9nusd9q
+            choices:
+              type: string
+              nullable: true
+              description: URL of the available custom field choices
+              example: https://api.welcomesoftware.com/v3/tasks/5f857f30e1c4a2038d6179e9/custom-fields/9nu8ue9wf8u9nusd9q/choices
+          required:
+            - self
+            - choices
+      required:
+        - id
+        - name
+        - type
+        - values
+        - links
+
+    ResourceCustomFieldRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        values:
+          type: array
+          minLength: 1
+          description: |
+            Array of choice ids if custom field has choices, otherwise text values to update the custom field values with. Must contain at least 1 id / value in the array. For custom field of type `checkboxes`, array of multiple choice ids can be provided as values.
+            Value for custom field of type `date_field` must follow this format: `YYYY-MM-DD`.
+          items:
+            type: string
+            example: 1nu8ue9wf8u9nusd9u
+      required:
+        - values
+
+    ResourceCustomFieldChoiceResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the custom field choice
+          example: j90uv0sd9i0si09sdip
+        name:
+          type: string
+          description: Name of the custom field choice
+          example: Some option
+      required:
+        - id
+        - name
+
+    Pagination:
+      type: object
+      additionalProperties: false
+      description: Pagination related information
+      properties:
+        next:
+          type: string
+          nullable: true
+          description: URL to the next page
+          example: https://api.welcomesoftware.com/<some-path-to-next-page>?offset=10&page_size=10
+        previous:
+          type: string
+          nullable: true
+          description: URL to the previous page
+          example: null
+      required:
+        - next
+        - previous
+
+    Error:
+      type: object
+      additionalProperties: true
+      description: Error payload
+      properties:
+        message:
+          type: string
+          description: Message describing the error
+          example: Not found
+        errors:
+          type: object
+          description: Additional information
+          additionalProperties: true
+          properties: {}
+      required:
+        - message
+
+    TaskResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the task
+          example: 5d7f910551b00a722e0418830cee5534
+        title:
+          type: string
+          description: Title of the task
+          example: Awesome Task
+        start_at:
+          type: string
+          nullable: true
+          format: date-time
+          description: Start date and time of the task in ISO 8601 UTC format (eg. 2020-02-10T10:40:45Z)
+          example: '2019-10-06T13:15:30Z'
+        due_at:
+          type: string
+          nullable: true
+          format: date-time
+          description: Due date and time of the task in ISO 8601 UTC format (eg. 2020-02-10T10:40:45Z)
+          example: '2020-10-06T13:15:30Z'
+        is_completed:
+          type: boolean
+          description: Determines if the task is completed or not
+          example: false
+        is_archived:
+          type: boolean
+          description: Determines if the task is archived or not
+          example: false
+        reference_id:
+          type: string
+          description: Reference ID of the task
+          example: TSK-123
+        labels:
+          type: array
+          description: Labels associated to the task
+          items:
+            $ref: '#/components/schemas/ResourceLabelResponse'
+        steps:
+          type: array
+          description: Steps of the task
+          items:
+            $ref: '#/components/schemas/TaskStep'
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the task
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534
+            assets:
+              type: string
+              description: URL for getting the list of the task assets or adding a new asset to the task
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/assets
+            attachments:
+              type: string
+              description: URL for getting the list of the task attachments
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/attachments
+            brief:
+              type: string
+              nullable: true
+              description: URL of the task brief
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/brief
+            campaign:
+              type: string
+              description: URL of the campaign that the task is associated with
+              example: https://api.welcomesoftware.com/v3/campaigns/2e7f9107351b00a722e0412230cee5534
+            custom_fields:
+              type: string
+              nullable: true
+              description: URL of the list of custom fields added to the task
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/custom-fields
+            web_urls:
+              type: object
+              additionalProperties: false
+              description: web urls
+              properties:
+                self:
+                  type: string
+                  description: Web URL of the task
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5c52cc153db27d0e5141146f
+                brief:
+                  type: string
+                  description: Web URL of the task brief
+                  example: https://app.welcomesoftware.com/cloud/taskv3/5c52cc153db27d0e5141146f?activeTab=brief
+              required:
+                - self
+                - brief
+          required:
+            - self
+            - assets
+            - attachments
+            - brief
+            - campaign
+            - custom_fields
+            - web_urls
+      required:
+        - id
+        - title
+        - start_at
+        - due_at
+        - is_completed
+        - is_archived
+        - reference_id
+        - labels
+        - steps
+        - links
+
+    TaskStep:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the step
+          example: 6d7f910551b00a722e0418830cee5564
+        title:
+          type: string
+          description: Title of the step
+          example: Sample step
+        is_completed:
+          type: boolean
+          description: Determines if the step is completed in _Welcome_
+          example: false
+        description:
+          type: string
+          nullable: true
+          description: Description of the step
+          example: Description of the step
+        due_at:
+          type: string
+          nullable: true
+          format: date-time
+          description: Due date and time of the step containing the sub step in ISO 8601 UTC format (eg. 2020-02-10T10:40:45Z)
+          example: '2020-10-06T13:15:30Z'
+        sub_steps:
+          type: array
+          description: Sub steps of the step
+          items:
+            $ref: '#/components/schemas/TaskSubStep'
+      required:
+        - id
+        - title
+        - is_completed
+        - description
+        - due_at
+        - sub_steps
+
+    TaskSubStep:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the sub step
+          example: 9c7f910551b00a722e0418830cee2564
+        title:
+          type: string
+          description: Title of the sub step
+          example: Sample step
+        assignee_id:
+          type: string
+          nullable: true
+          description: ID of the assignee of the step containing the sub step
+          example: 5fdf31d57f0d0e362e2b5908
+        is_completed:
+          type: boolean
+          description: Determines if the sub step is completed in _Welcome_
+          example: false
+        is_skipped:
+          type: boolean
+          description: Determines if the sub step is skipped in _Welcome_
+          example: false
+        is_external:
+          type: boolean
+          description: Determines if the sub step is external in _Welcome_
+          example: true
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the sub step
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/steps/6d7f910551b00a722e0418830cee5564/sub-steps/9c7f910551b00a722e0418830cee2564
+            task:
+              type: string
+              description: URL of the task
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534
+            external_work:
+              type: string
+              nullable: true
+              description: URL of the external work associated with sub step if sub step is external in _Welcome_
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/steps/6d7f910551b00a722e0418830cee5564/sub-steps/9c7f910551b00a722e0418830cee2564/external-work
+            assignee:
+              type: string
+              nullable: true
+              description: Assignee of the step containing the sub step
+              example: https://api.welcomesoftware.com/v3/users/5fdf31d57f0d0e362e2b5908
+          required:
+            - self
+            - task
+            - external_work
+      required:
+        - id
+        - title
+        - assignee_id
+        - is_completed
+        - is_skipped
+        - is_external
+        - links
+
+    TaskSubStepRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        is_completed:
+          type: boolean
+          enum:
+            - true
+          description: If the sub step should be completed, cannot be passed together with `assignee_id`
+          example: true
+        assignee_id:
+          type: string
+          nullable: true
+          description: ID of the assignee for the sub step, cannot be passed together with `is_completed`
+          example: 5fdf31d57f0d0e362e2b5908
+
+    TaskSubStepCommentResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the sub step comment
+          example: 5fe38c39574b52a62a089239
+        value:
+          type: string
+          description: Content of the comment
+          example: Well done!
+        is_resolved:
+          type: boolean
+          description: Determines if the comment is resolved in _Welcome_
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          description: Creation date and time of the task sub step comment in ISO 8601 UTC format (eg. 2020-02-10T10:40:45Z)
+          example: '2020-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Last modification date and time of the task sub step comment in ISO 8601 UTC format (eg. 2020-02-10T10:40:45Z)
+          example: '2020-10-06T14:15:30Z'
+        attachments:
+          description: List of attachments of the comment
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentResponse'
+          example: [{"id": "a113667245d111eb8945000c", "name": "sample.png", "url": "https://files.welcomesoftware.com/download/96c314a645d111eb8945000c291b51d4?token="}]
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the sub step comment
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/steps/6d7f910551b00a722e0418830cee5564/sub-steps/9c7f910551b00a722e0418830cee2564
+            comment_by:
+              type: string
+              description: Creator of the sub step comment
+              example: https://api.welcomesoftware.com/v3/users/5fe38eea574b52a62a08923a
+            task:
+              type: string
+              description: URL of the task
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534
+            sub_step:
+              type: string
+              description: URL of the sub step
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/steps/6d7f910551b00a722e0418830cee5564/sub-steps/9c7f910551b00a722e0418830cee2564
+          required:
+            - self
+            - comment_by
+            - task
+            - sub_step
+      required:
+        - id
+        - value
+        - is_resolved
+        - created_at
+        - modified_at
+        - attachments
+
+    CommentPostRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: string
+          minLength: 1
+          description: Content of the comment. To mention a user belonging to the organization, use the `@[name](openapi-user-link)` format.
+          example: Comment mentioning @[Organization User](https://api.welcomesoftware.com/v3/users/5fe38aeb574b52a62a089238)
+        attachments:
+          description: List of comment attachments.
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentRequest'
+      required:
+        - value
+
+    TaskSubStepCommentPatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: string
+          minLength: 1
+          description: Updated comment value. To mention a user belonging to the organization, use `@[name](openapi-user-link)` format.
+          example: Updated comment mentioning @[Organization User](https://api.welcomesoftware.com/v3/users/5fe38aeb574b52a62a089238)
+      required:
+        - value
+
+    TaskAssetCommentResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the comment
+          example: 5fe38c39574b52a62a089239
+        value:
+          type: string
+          description: Content of the comment
+          example: Well done!
+        is_resolved:
+          type: boolean
+          description: Determines if the comment is resolved in _Welcome_
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          description: Creation date and time of the comment in ISO 8601 UTC format (eg. 2020-02-10T10:40:45Z)
+          example: '2020-10-06T13:15:30Z'
+        modified_at:
+          type: string
+          format: date-time
+          description: Last modification date and time of the comment in ISO 8601 UTC format (eg. 2020-02-10T10:40:45Z)
+          example: '2020-10-06T14:15:30Z'
+        attachments:
+          description: List of attachments of the comment
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentResponse'
+          example: [{"id": "a113667245d111eb8945000c", "name": "sample.png", "url": "https://files.welcomesoftware.com/download/96c314a645d111eb8945000c291b51d4?token="}]
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+          # TODO: self should be exposed once GET /comments/:comment_id is ready
+            # self:
+              # type: string
+              # description: URL of the asset comment
+              # example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/assets/6d7f910551b00a722e0418830cee5564/comments/9c7f910551b00a722e0418830cee2564
+            task:
+              type: string
+              description: URL of the task
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534
+            asset:
+              type: string
+              description: Url of the asset
+              example: https://api.welcomesoftware.com/v3/tasks/5d7f910551b00a722e0418830cee5534/images/6d7f910551b00a722e0418830cee5564
+          required:
+            #- self
+            - task
+            - asset
+      required:
+        - id
+        - value
+        - is_resolved
+        - created_at
+        - modified_at
+        - attachments
+        - links
+
+    CampaignResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the campaign
+          example: 8q7f910551b00a722e0418830cee6612
+        title:
+          type: string
+          description: Title of the campaign
+          example: The awesome campaign
+        description:
+          type: string
+          nullable: true
+          description: Description of the campaign
+          example: The awesome campaign's description
+        start_date:
+          type: string
+          nullable: true
+          description: 'Start date of the campaign in ISO 8601 format: `YYYY-MM-DD`'
+          example: '2019-10-06'
+        end_date:
+          type: string
+          nullable: true
+          description: 'End date of the campaign in ISO 8601 format: `YYYY-MM-DD`'
+          example: '2019-10-16'
+        is_hidden:
+          type: boolean
+          description: Whether the campaign is hidden or not
+          example: false
+        reference_id:
+          type: string
+          description: Reference identifier of the campaign
+          example: CPN-1589
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the campaign
+              example: https://api.welcomesoftware.com/v3/campaigns/8q7f910551b00a722e0418830cee6612
+            parent_campaign:
+              type: string
+              nullable: true
+              description: URL of the parent campaign
+              example: https://api.welcomesoftware.com/v3/campaigns/7u7f910551b00a722e0418830cee6643
+          required:
+            - self
+            - parent_campaign
+      required:
+        - id
+        - title
+        - description
+        - start_date
+        - end_date
+        - is_hidden
+        - reference_id
+        - links
+
+    UserResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the user
+          example: 5fe4925ef8a9378056bf4e37
+        first_name:
+          type: string
+          description: First name of the user
+          example: John
+        last_name:
+          type: string
+          description: Last name of the user
+          example: Doe
+        full_name:
+          type: string
+          description: Full name of the user
+          example: John Doe
+        email:
+          type: string
+          nullable: true
+          description: Email of the user, null unless the application is configured expose user email
+          example: john.doe@example.com
+        links:
+          type: object
+          additionalProperties: false
+          description: Meta links
+          properties:
+            self:
+              type: string
+              description: URL of the user
+              example: https://api.welcomesoftware.com/v3/users/5fe4925ef8a9378056bf4e37
+      required:
+        - id
+        - first_name
+        - last_name
+        - full_name
+        - email
+    
+    Setting:
+      type: object
+      additionalProperties: false
+      properties:
+        labels:
+          type: array
+          description: Setting Labels  
+          items:
+            $ref: '#/components/schemas/SettingLabelGroup'
+        custom_fields:
+          type: object
+          description: Setting Custom Fields 
+          $ref: '#/components/schemas/SettingCustomField'
+        workflows:
+          type: array
+          description: Setting Workflows 
+          items:
+            $ref: '#/components/schemas/SettingWorkflow' 
+        webhooks:
+          type: array
+          description: Setting Webhooks  
+          items:
+            $ref: '#/components/schemas/SettingWebhook' 
+        apps:
+          type: array
+          description: Setting Apps 
+          items:
+            $ref: '#/components/schemas/SettingApp'
+        templates:
+          type: array
+          description: Setting Templates 
+          items:
+            $ref: '#/components/schemas/SettingTemplate'
+        routing_rules:
+          type: array
+          description: Setting Routing-Rules 
+          items:
+            $ref: '#/components/schemas/SettingRoutingRule' 
+      required:
+        - labels
+        - custom_fields
+        - workflows
+        - webhooks
+        - apps
+        - templates
+        - routing_rules
+  
+    SettingLabelGroup:
+      type: object
+      additionalProperties: false
+      properties:
+        has_single_value:
+          type: boolean
+          description: single / multiple value support indicator for label group
+          example: true
+        label_type:
+          type: string
+          description: Name of the label group
+          example: Content Pillar
+        labels:
+          description: Values of the labels of label-groups
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingLabel'
+      required:
+        - has_single_value
+        - label_type
+        - labels
+
+    SettingLabel:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: Name of the label 
+          example: Pillar1
+        color:
+          type: string
+          description: Color of the label
+          nullable: true
+          example: "#4ECFD5"
+          default: None 
+      required:
+        - name
+        - color
+    
+    SettingCustomField:
+      type: object
+      description:  Setting Custom Fields 
+      additionalProperties: false
+      properties:
+        currency:
+          description: list of currency CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingCurrencyCustomField'
+        number:
+          description: list of number CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingNumberCustomField'
+        percentage:
+          description: list of percentage CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingPercentageCustomField'
+        checkbox:
+          description: list of checkbox CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingMultipleOptionCustomField'
+        dropdown:
+          description: list of dropdown CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingMultipleOptionCustomField'
+        multichoice:
+          description: list of multichoice CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingMultipleOptionCustomField'
+        multi_select_dropdown:
+          description: list of multi_select_dropdown CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingMultipleOptionCustomField'
+        date:
+          description: list of date CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingLabelOnlyCustomField'
+        image:
+          description: list of image CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingLabelOnlyCustomField'
+        richtext:
+          description: list of richtext CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingLabelOnlyCustomField'
+        string:
+          description: list of string CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingLabelOnlyCustomField'
+        textarea:
+          description: list of textarea CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingLabelOnlyCustomField'
+        video:
+          description: list of video CustomField
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingLabelOnlyCustomField'
+      required:
+        - currency
+        - number
+        - percentage
+        - checkbox
+        - dropdown
+        - multichoice
+        - multi_select_dropdown
+        - date
+        - image
+        - richtext
+        - string
+        - textarea
+        - video 
+
+    SettingCurrencyCustomField:
+      type: object
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          description: Name of the customfield
+          example: A Currency Custom Field
+        decimal_places:
+          type: interger 
+          description: Value of decimal Places
+          nullable: true
+          example: 1
+          default: None
+        currency_code:
+          type: string
+          description: Curency code of customfield
+          example: USD
+          default: USD
+        has_thousand_separator:
+          type: boolean
+          description: Indicator of thousand separator 
+          example: False
+          default: False
+      required:
+        - label
+        - decimal_places
+        - currency_code
+        - has_thousand_separator
+    
+    SettingNumberCustomField:
+      type: object
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          description: Name of the customfield
+          example: A Number Custom Field
+        decimal_places:
+          type: interger 
+          description: Value of decimal Place
+          nullable: true
+          example: 1
+        has_thousand_separator:
+          type: boolean
+          description: Indicator of thousand separator 
+          example: False
+          default: False
+      required:
+        - label
+        - decimal_places
+        - has_thousand_separator
+    
+    SettingPercentageCustomField:
+      type: object
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          description: Name of the customfield
+          example: A Percentage Custom Field
+        decimal_places:
+          type: interger 
+          description: Value of decimal Place
+          nullable: true
+          example: 1
+          default: None 
+      required:
+        - label
+        - decimal_places
+
+    SettingMultipleOptionCustomField:
+      type: object
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          description: Name of the customfield
+          example: A CustomField With Choice
+        choices:
+          type: array of string 
+          description: customfield choices
+          example: ["choice1","choice2"]
+      required:
+        - label
+        - choices
+    
+    SettingLabelOnlyCustomField:
+      type: object
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          description: Name of the customfield
+          example: A Custom Field
+      required:
+        - label
+
+    SettingWorkflow:
+      type: object
+      additionalProperties: false
+      properties:
+        is_flexible_workflow:
+          type: boolean
+          description: Indicates if workflow is flexible
+          example: false
+        is_not_pushed_to_library_by_default:
+          type: boolean
+          description: Indicates if workflow is pushed to library by default
+          example: false
+        is_released_as_asset:
+          type: boolean
+          description: Indicates if is released as asset
+          example: false
+        name:
+          type: string
+          description: Name of the workflow
+          example: A Workflow
+        labels:
+          description: List of the associated labels
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingWorkflowLabel'
+        custom_fields:
+          description: List of the associated customfield
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingWorkflowCustomfield'
+        default_channels:
+          description: List of the associated channels
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingWorkflowChannel'
+        blacklisted_channels:
+          description: List of the blacklisted channels
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingWorkflowChannel'
+        steps:
+          description: List of the workflow steps
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingWorkflowStep'           
+        description:
+          type: string
+          description: Description of the workflow
+          nullable: true
+          example: Sample description
+          default: None 
+      required:
+        - is_flexible_workflow
+        - is_not_pushed_to_library_by_default
+        - is_released_as_asset
+        - name 
+        - labels
+        - custom_fields
+        - default_channels
+        - blacklisted_channels
+        - steps
+        - description
+    
+    SettingWorkflowLabel:
+      type: object
+      additionalProperties: false
+      properties:
+        default_value:
+          type: array of string
+          description: List of label names
+          example: ["label1", "label2"]
+        is_required:
+          type: boolean
+          description: indicates if label is required
+          example: true
+        label_type:
+          type: string
+          description: Name of Label Group
+          example: Content Pillar
+        is_required_at_task_creation:
+          type: boolean
+          description: indicates if label is required at task creation
+          example: false
+      required:
+        - default_value
+        - is_required
+        - label_type
+        - is_required_at_task_creation
+    
+    SettingWorkflowCustomfield:
+      type: object
+      additionalProperties: false
+      properties:
+        is_required:
+          type: boolean
+          description: indicates if customfield is required 
+          example: false
+        field:
+          type: string
+          description: Name of customfield
+          example: exampleCustomField
+        default_value:
+          type: array of string
+          description: List of customfield choice
+          example: ["choice1", "choice2"]
+          default: [] 
+        type:
+          type: string
+          description: Type of customfield
+          example: equal
+      required:
+        - is_required
+        - field
+        - default_value
+        - type
+
+    SettingWorkflowChannel:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name:
+          type: string
+          description: Name of channel
+          example: exampleChannel
+        type:
+          type: string
+          description: Type of channel
+          example: twitter
+      required:
+        - display_name
+        - type
+
+    SettingWorkflowStep:
+      type: object
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          description: Name of workflow step
+          example: Step 1 
+        substeps:
+          array: array
+          description: List of the associated labels
+          items:
+            $ref: '#/components/schemas/SettingWorkflowSubStep'
+        description:
+          type: string
+          description: Description of workflow step
+          nullable: true
+          example: This is a dummy example
+          default: None 
+        duration:
+          type: integer
+          description: Duration of workflow step
+          nullable: true
+          example: 1
+          default: None 
+      required:
+        - label
+        - substeps
+        - description
+        - duration
+
+    SettingWorkflowSubStep:
+      type: object
+      additionalProperties: false
+      properties:
+        actions:
+          type: array of string
+          description: list of actions
+          example: ["findContent","writeEditSocialPost"]
+        label:
+          type: string
+          description: Name of substep
+          nullable: true
+          example: Substep 1
+          default: None 
+        external_sub_step_config:
+          type: object
+          description: external substep config
+          additionalProperties: false
+          properties:
+            is_user_interaction_allowed:
+              description: Indiates if user interaction is allowed
+              type: boolean
+              example: false
+              default: {'is_user_interaction_allowed': False}
+        is_external:
+          type: boolean
+          description: Indicated if a substep is external
+          nullable: true
+          example: true
+          default: false
+        external_system:
+          type: string
+          description: Description of workflow substep step
+          nullable: true
+          example: null
+          default: None 
+        description:
+          type: string
+          description: Description of workflow step
+          nullable: true
+          example: This is substep description
+          default: None 
+      required:
+        - actions
+        - label
+        - is_external
+        - external_system
+        - description
+
+    SettingWebhook:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: Name of the workflow
+          example: Webhook 1
+        description:
+          type: string
+          description: Description of the Webhook
+          example: Sample description
+        callback_url:
+          type: string
+          description: Name of the workflow
+          example: https://exampledomain.com
+        secret:
+          type: string
+          description: webhook url secret 
+          example: secret121
+        event_names:
+          description: List of the webhook event names
+          type: array of string
+          example: ["asset_added","asset_removed"]       
+      required:
+        - name
+        - description
+        - callback_url
+        - secret
+        - event_names 
+    
+    SettingApp:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: Name of the workflow
+          example: App 1
+        description:
+          type: string
+          description: Description of the app
+          example: Sample description
+        homepage_url:
+          type: string
+          description: Homepage url for app
+          example: https://example1.com
+        authorization_callback_urls:
+          description: List of the webhook app authorization callback urls
+          type: array of string
+          example: ["https://example1.com","https://example2.com"]
+        expose_email:
+          type: boolean
+          description: indicates if email should be exposed or not
+          example: true
+        env:
+          type: string
+          description: webhook url secret 
+          example: production       
+      required:
+        - name
+        - description
+        - homepage_url
+        - authorization_callback_urls
+        - expose_email
+        - env
+    
+    SettingTemplate:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: name of template
+          example: Template 1
+        description:
+          type: string
+          description: description of template
+          example: Template description
+        public_description:
+          type: string
+          description: Public description of template
+          example: Template public description
+        form_fields:
+          array: array
+          description: List of the template form_fields
+          items:
+            $ref: '#/components/schemas/SettingTemplateFormField'
+        sections:
+          array: array
+          description: List of the template sections
+          items:
+            $ref: '#/components/schemas/SettingTemplateSection'
+        instructions:
+          array: array
+          description: List of the template instructions
+          items:
+            $ref: '#/components/schemas/SettingTemplateInstruction'
+        types:
+          type: array of string
+          description: List of type of template
+          example: [ "campaign_brief", "task_brief","work_request" ]
+      required:
+        - name
+        - description
+        - public_description
+        - form_fields
+        - sections
+        - instructions
+        - types
+
+    SettingTemplateFormField:
+      type: object
+      additionalProperties: false
+      properties:
+        field_type:
+          type: string
+          description: type of template form field
+          example: custom_field
+        help:
+          type: string
+          description: helper text for form field
+          example: This is a helper text
+        is_required:
+          type: boolean
+          description: Indicates if the form field is required
+          example: false   
+        logic_rules:
+          array: array
+          description: List of the template logic rules
+          items:
+            $ref: '#/components/schemas/SettingTemplateLogicRule'  
+        sort_order:
+          type: integer
+          description: Indicates if the form field is required
+          example: 0   
+        identifier:
+          type: string
+          description: Name of the form field
+          example: SingleChoice1  
+        custom_field_type:
+          type: string
+          description: Type of the customfield form field
+          nullable: true
+          example: multichoice   
+      required:
+        - field_type 
+        - help 
+        - is_required  
+        - logic_rules  
+        - sort_order  
+        - identifier  
+        - custom_field_type
+
+    SettingTemplateLogicRule:
+      type: object
+      additionalProperties: false
+      properties:
+        action:
+          type: object
+          properties:
+            target_field:
+              type: object
+              additionalProperties: false
+              properties:
+                identifier:
+                  label: string
+                  description: Name of the template section
+                  example: end_of_form 
+                custom_field_type:
+                  label: string
+                  description: Name of the template section
+                  nullable: true
+                  example: null 
+                type:
+                  label: string
+                  description: Name of the template section
+                  example: end_of_form 
+            type:
+              type: string
+              description: Name of the form field
+              example: jump_to  
+            values:
+              type: array of string
+              description: List of type of template
+              example: []
+        condition:
+          type: object
+          additionalProperties: false
+          properties:
+            operator:
+              label: string
+              description: Name of the template section
+              example: equal 
+            values:
+              type: array of string
+              description: List of type of template
+              example: [ "choice1"]
+      required:
+        - action 
+        - condition
+
+    SettingTemplateSection:
+      type: object
+      additionalProperties: false
+      properties:
+        label:
+          label: array of string
+          description: Name of the template section
+          example: Test section 
+        id:
+          id: string
+          description: Id of the template section
+          example: 9ec506f480dbc2d5f6919168ae448c41
+      required:
+        - label 
+        - id 
+    
+    SettingTemplateInstruction:
+      type: object
+      additionalProperties: false
+      properties:
+        description:
+          label: string
+          description: Description of the template instruction
+          example: Test instruction description
+        id:
+          id: string
+          description: Id of the template instruction
+          example: 9ec506f480dbc2d5f6919168ae448c40
+      required:
+        - description 
+        - id 
+      
+    SettingRoutingRuleAssociatedRule:
+      type: object
+      additionalProperties: false
+      properties:
+        field_type:
+          type: string
+          description: name of rule field type
+          example: customField
+        identifier:
+          type: string
+          description: Name of the rule identifier
+          nullable: true
+          example: exampleCustomField1
+        operator:
+          type: string
+          description: Name of the rule operator
+          example: equal
+        values:
+          description: List of the associated label/custom field choice
+          type: array of string
+          example: ["value1","value2"]
+        unit:
+          type: string
+          description: Name of the routing-rule
+          nullable: true
+          example: null
+        custom_field_type:
+          type: string
+          description: associated custom field type
+          nullable: true
+          example: multichoice
+      required:
+        - field_type
+        - identifier
+        - operator
+        - values
+        - unit
+        - custom_field_type
+
+    SettingRoutingRule:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: Name of the routing-rule
+          example: example Routing Rule
+        rules:
+          description: List of the associated rules
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingRoutingRuleAssociatedRule'
+        watchers:
+          description: List of the routing rule watchers email
+          type: array of string 
+          example: ["examplewatcher@gmail.com"]            
+        description:
+          type: string
+          description: Description of the routing-rule
+          example: Sample routing rule description
+        template_name:
+          type: string
+          description: Name of asscociated template
+          nullable: true
+          example: Sample template name
+      required:
+        - name
+        - rules
+        - watchers
+        - description
+        - template_name
+    
+    SettingChangesetSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        labels:
+          description: List of the label names
+          type: array of string 
+          example: ["A LabelGroup"]
+        custom_fields:
+          description: List of the custom field names
+          type: array of string 
+          example: ["A Custom Field"]
+        workflows:
+          description: List of the workflow names
+          type: array of string 
+          example: ["A WorkFlow"]
+        webhooks:
+          description: List of the webhook names
+          type: array of string 
+          example: ["A Webhook"]
+        apps:
+          description: List of the app names
+          type: array of string 
+          example: ["A App"]
+        templates:
+          description: List of the template names
+          type: array of string 
+          example: ["A Template"]
+        routing_rules:
+          description: List of the routing rule names
+          type: array of string 
+          example: ["A routing Rule"]
+      required:
+        - labels
+        - custom_fields
+        - workflows
+        - webhooks
+        - apps
+        - templates
+        - routing_rules
+
+    SettingChangeset:
+      type: object
+      additionalProperties: false
+      properties:
+        create:
+          type: object
+          description: created settings  
+          $ref: '#/components/schemas/SettingChangesetSchema'
+        update:
+          type: object
+          description: updated settings
+          $ref: '#/components/schemas/SettingChangesetSchema'
+      required:
+        - create
+        - update
+    
+    SettingResource:
+      type: object
+      additionalProperties: false
+      properties:
+        resources:
+          type: object
+          description: Fetched settings
+          $ref: '#/components/schemas/Setting'
+      required:
+        - resources
+
+    SettingPostResource:
+      type: object
+      additionalProperties: false
+      properties:
+        resources:
+          type: object
+          description: created/updated settings
+          $ref: '#/components/schemas/Setting'
+        changeset:
+          type: object
+          description: changeset of created/updated settings
+          $ref: '#/components/schemas/SettingChangeset'
+      required:
+        - resources
+        - changeset
+         
+  parameters:
+    offset:
+      name: offset
+      in: query
+      description: Starting index of results (zero indexed)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      example: 5
+
+    page_size:
+      name: page_size
+      in: query
+      description: Number of results to return per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+      example: 15

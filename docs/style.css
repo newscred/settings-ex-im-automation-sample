@@ -1,0 +1,257 @@
+ /**********************Graphik Fonts************************
+***************************************************************/
+
+@font-face {
+    font-family: 'Graphik';
+    font-style: normal;
+    font-weight: 300;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Light-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Light-Web.woff') format('woff');
+  }
+
+  @font-face {
+    font-family: 'Graphik';
+    font-style: normal;
+    font-weight: 400;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Regular-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Regular-Web.woff') format('woff');
+  }
+
+  @font-face {
+    font-family: 'Graphik';
+    font-style: normal;
+    font-weight: 500;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Medium-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Medium-Web.woff') format('woff');
+  }
+
+  @font-face {
+    font-family: 'Graphik';
+    font-style: normal;
+    font-weight: 600;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Semibold-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Semibold-Web.woff') format('woff');
+  }
+
+  @font-face {
+    font-family: 'Graphik';
+    font-style: normal;
+    font-weight: 700;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Bold-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Bold-Web.woff') format('woff');
+  }
+
+
+  @font-face {
+    font-family: 'Graphik Regular';
+    font-style: normal;
+    font-weight: 300;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Light-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Light-Web.woff') format('woff');
+  }
+
+
+  @font-face {
+    font-family: 'Graphik Regular';
+    font-style: normal;
+    font-weight: 400;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Regular-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Regular-Web.woff') format('woff');
+  }
+
+  @font-face {
+    font-family: 'Graphik Regular';
+    font-style: normal;
+    font-weight: 500;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Medium-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Medium-Web.woff') format('woff');
+  }
+
+  @font-face {
+    font-family: 'Graphik Regular';
+    font-style: normal;
+    font-weight: 700;
+    font-display: auto;
+    src: url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Bold-Web.woff2') format('woff2'),
+      url('https://welcomesoftware.com/wp-content/uploads/2021/04/Graphik-Bold-Web.woff') format('woff');
+  }
+
+
+
+  /**********************Global Variables************************
+***************************************************************/
+
+  :root {
+    --dark: #191932;
+    --grey4: #474759;
+    --grey3: #808091;
+    --grey2: #CCCCDC;
+    --grey1: #EDEDF4;
+    --primary: #702BD8;
+    --spring-green: #5FEEAD;
+
+    --welcome-font: "Graphik", Arial, Helvetica, sans-serif;
+
+    --big-font-size: 1.6rem;
+    --default-font-size: 1.4rem;
+    --small-font-size: 1.2rem;
+  }
+
+*::after,
+*::before {
+  margin: 0;
+  padding: 0;
+  box-sizing: inherit;
+}
+
+a:link{
+    text-decoration: none;
+    font-weight: 500;
+}
+
+html {
+    font-size: 62.5%; /* to set 10px = 1rem*/
+  }
+
+body {
+    box-sizing: border-box;
+    font-family: var(--welcome-font);
+    font-size: 1.4rem;
+    color: var(--dark);
+  }
+
+/* main css starts */
+
+.header{
+    margin-top:1rem;
+    display: flex;
+    width: 96vw;
+    min-height: 6rem;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 3rem;
+}
+
+.nav{
+    list-style: none;
+}
+
+.nav li{
+    display: inline-block;
+}
+
+.nav li:not(:first-child){
+    margin-left: 2.5rem;
+}
+
+.nav li a{
+    color: var(--dark);
+    font-weight: 600;
+    transition: transform 0.3s ease;
+}
+
+.nav li a:hover{
+    color: var(--primary);
+    transform: translateX(.5rem);
+}
+
+.hero{
+    margin-top:1rem;
+    background-image: linear-gradient(to right bottom, rgba(84, 32, 162, .95),
+    rgba(186, 39, 228, .95)), url(hero-img.png);
+    height: 30rem;
+    background-position: top;
+    background-size: cover;
+}
+
+.hero__wrapper {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding-top: 5rem;
+}
+
+.hero__greetings{
+    font-size: 4rem;
+    font-weight: 600;
+    line-height: 4.4rem;
+    color: white;
+    margin-bottom: 1rem;
+    animation: moveInLeft .6s;
+    text-align: center;
+}
+
+.hero__blurb {
+    font-size: 2rem;
+    text-align: center;
+    margin-top: 3rem;
+    color: white;
+    line-height: 2.8rem;
+    animation: moveInLeft .6s;
+    font-weight: 400;
+}
+
+.boxes {
+    width: 60rem;
+    margin: 3rem auto;
+    display: flex;
+}
+
+.boxes__openapi, .boxes__webhook {
+    width: 30rem;
+    height: 30rem;
+    display: flex;
+    background-color: var(--grey1) ;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--welcome-dark);
+    animation: moveInBottomTop .6s;
+    transition: transform 0.3s ease;
+}
+
+.boxes__openapi:hover, .boxes__webhook:hover{
+    transform: translateY(-0.3rem);
+    background-color: var(--primary);
+    color: white;
+}
+.boxes__webhook {
+    margin-left: 4rem;
+}
+
+.welcome {
+    font-style:italic;
+}
+
+@keyframes moveInLeft {
+    0% {
+        opacity: 0;
+        transform: translateX(-10rem);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes moveInBottomTop {
+    0% {
+        opacity: 0;
+        transform: translateY(20rem);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
