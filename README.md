@@ -1,11 +1,14 @@
-# Welcome Settings (config) as Code
+# Welcome Settings Import/Export Example
+[API Documentation](https://newscred.github.io/settings-ex-im-automation-sample/openapi.html#tag/Settings)  
+
+
 [![Update target Welcome instance via Github Action](https://github.com/newscred/settings-ex-im-automation-sample/actions/workflows/import.yml/badge.svg)](https://github.com/newscred/settings-ex-im-automation-sample/actions/workflows/import.yml)
 
 ## Import in target instance
 
 [API Documentation](https://newscred.github.io/settings-ex-im-automation-sample/openapi.html#tag/Settings/paths/~1settings/post)  
 
-Import an existing config file `./config.json` (see how to generate it [here](/#Export-from-source-instance))  
+Import an existing config file `./config.json` (see how to generate it in the "Export from source instance" section below).  
 Get an access token using an app from the target instance.
 Use it as `ACCESS_TOKEN` environment variable to run `./scripts/curl/import.sh`.
 

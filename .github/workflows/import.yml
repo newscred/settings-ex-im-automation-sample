@@ -1,4 +1,4 @@
-name: Import config.json in target Welcome instance
+name: Update target Welcome instance via Github Action
 on:
   push:
     branches:
