@@ -1,8 +1,9 @@
 # Welcome Settings (config) as Code
-[![Update target Welcome instance](https://github.com/mehamasum/welcome-config-as-code/actions/workflows/import.yml/badge.svg)](https://github.com/mehamasum/welcome-config-as-code/actions/workflows/import.yml)
-
+[![Update target Welcome instance via Github Action](https://github.com/newscred/settings-ex-im-automation-sample/actions/workflows/import.yml/badge.svg)](https://github.com/newscred/settings-ex-im-automation-sample/actions/workflows/import.yml)
 
 ## Import in target instance
+
+[API Documentation](https://newscred.github.io/settings-ex-im-automation-sample/openapi.html#tag/Settings/paths/~1settings/post)  
 
 Import an existing config file `./config.json` (see how to generate it [here](/#Export-from-source-instance))  
 Get an access token using an app from the target instance.
@@ -23,6 +24,8 @@ Example: Github action (see `.github/workflows/import.yml`)
 
 
 ## Export from source instance
+
+[API Documentation](https://newscred.github.io/settings-ex-im-automation-sample/openapi.html#tag/Settings/paths/~1settings/get)  
 
 Get an access token using an app from the source instance.  
 Use it as `ACCESS_TOKEN` environment variable to run `./scripts/curl/export.sh` and save the response in `./config.json`.
