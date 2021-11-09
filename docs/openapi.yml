@@ -2314,7 +2314,6 @@ paths:
         - Settings
       summary: GET /settings
       description: Get settings
-      
       responses:
         '200':
           description: Fetched settings
@@ -2335,7 +2334,36 @@ paths:
       tags:
         - Settings
       summary: POST /settings
-      description: Create or update settings
+      description: |
+        Create or update settings
+        ## Import Behaviour:
+        - Label: 
+            - If label-group with the same name exists, the label-group will be updated.
+              - Labels will get merged.
+              - If label with same name exists, it will be overwritten.
+            - If no label-group with same name exists, new label-group will be created.
+        - Custom Fields:
+            - If custom field with the same name exists, the custom field will be updated and it's choices will get merged.
+            - If no custom field with same name exists, new custom field will be created.
+        - Workflows:
+            - If the query param overwrite_workflows=true the existing workflows will be overwritten.
+              Otherwise a new workflow will be created where prefix `Copy of` will be added with the name of the workflow.
+        - Webhooks:
+            - If one single webhook with the same name exists, the webhook will be updated and it's events will get merged. 
+            - If multiple webhooks with same name exist, new webhook will be created.
+            - If no webhook with same name exists, new webhook will be created.
+        - Apps:
+            - If one single app with the same name exists, the app will be updated and it's authorization callback urls will be merged.
+            - If multiple apps with same name exist, new app will be created.
+            - If no app with same name exists, new app will be created.
+        - Templates:
+            - If one single template with the same name exists, the template will be updated.
+            - If multiple templates with same name exist, new template will be created.
+            - If no template with same name exists, new template will be created.
+        - Routing Rules:
+            - If one single routing rule with the same name exists, the routing rule will be updated.
+            - If multiple routing rules with same name exist, new routing rule will be created.
+            - If no routing rule with same name exists, new routing rule will be created. 
       parameters:
         - name: execute
           in: query
@@ -3979,12 +4007,17 @@ components:
             - template
             - attachment
             - text
+        title:
+          type: string
+          description: Title of the task brief
+          example: Awesome Task Brief
+          nullable: false
         template:
           # A workaround for the issue: https://github.com/OAI/OpenAPI-Specification/issues/1368
           nullable: true
           oneOf:
-            - $ref: '#/components/schemas/NullValue'
             - $ref: '#/components/schemas/TaskBriefTemplateValue'
+            - $ref: '#/components/schemas/NullValue'
         fields:
           description: List of fields of the brief
           type: array
@@ -4024,6 +4057,7 @@ components:
             - task
       required:
         - type
+        - title
         - fields
         - links
 
@@ -4791,14 +4825,14 @@ components:
       properties:
         has_single_value:
           type: boolean
-          description: single / multiple value support indicator for label group
+          description: Single / multiple value support indicator for label group
           example: true
         label_type:
           type: string
           description: Name of the label group
           example: Content Pillar
         labels:
-          description: Values of the labels of label-groups
+          description: List of names of labels of label-groups
           type: array
           items:
             $ref: '#/components/schemas/SettingLabel'
@@ -4820,7 +4854,7 @@ components:
           description: Color of the label
           nullable: true
           example: "#4ECFD5"
-          default: None 
+          default: null 
       required:
         - name
         - color
@@ -4919,11 +4953,11 @@ components:
           description: Name of the customfield
           example: A Currency Custom Field
         decimal_places:
-          type: interger 
+          type: integer 
           description: Value of decimal Places
           nullable: true
           example: 1
-          default: None
+          default: null
         currency_code:
           type: string
           description: Curency code of customfield
@@ -4949,7 +4983,7 @@ components:
           description: Name of the customfield
           example: A Number Custom Field
         decimal_places:
-          type: interger 
+          type: integer 
           description: Value of decimal Place
           nullable: true
           example: 1
@@ -4972,11 +5006,11 @@ components:
           description: Name of the customfield
           example: A Percentage Custom Field
         decimal_places:
-          type: interger 
+          type: integer 
           description: Value of decimal Place
           nullable: true
           example: 1
-          default: None 
+          default: null 
       required:
         - label
         - decimal_places
@@ -4990,8 +5024,11 @@ components:
           description: Name of the customfield
           example: A CustomField With Choice
         choices:
-          type: array of string 
+          type: array
           description: customfield choices
+          items:
+            type: string
+            example: "choice1"
           example: ["choice1","choice2"]
       required:
         - label
@@ -5058,7 +5095,7 @@ components:
           description: Description of the workflow
           nullable: true
           example: Sample description
-          default: None 
+          default: null 
       required:
         - is_flexible_workflow
         - is_not_pushed_to_library_by_default
@@ -5076,8 +5113,11 @@ components:
       additionalProperties: false
       properties:
         default_value:
-          type: array of string
+          type: array
           description: List of label names
+          items:
+            type: string
+            example: "label1"
           example: ["label1", "label2"]
         is_required:
           type: boolean
@@ -5110,8 +5150,11 @@ components:
           description: Name of customfield
           example: exampleCustomField
         default_value:
-          type: array of string
+          type: array
           description: List of customfield choice
+          items:
+            type: string
+            example: "choice1"
           example: ["choice1", "choice2"]
           default: [] 
         type:
@@ -5149,7 +5192,7 @@ components:
           description: Name of workflow step
           example: Step 1 
         substeps:
-          array: array
+          type: array
           description: List of the associated labels
           items:
             $ref: '#/components/schemas/SettingWorkflowSubStep'
@@ -5158,13 +5201,13 @@ components:
           description: Description of workflow step
           nullable: true
           example: This is a dummy example
-          default: None 
+          default: null 
         duration:
           type: integer
           description: Duration of workflow step
           nullable: true
           example: 1
-          default: None 
+          default: null 
       required:
         - label
         - substeps
@@ -5176,15 +5219,18 @@ components:
       additionalProperties: false
       properties:
         actions:
-          type: array of string
+          type: array
           description: list of actions
+          items:
+            type: string
+            example: "findContent"
           example: ["findContent","writeEditSocialPost"]
         label:
           type: string
           description: Name of substep
           nullable: true
           example: Substep 1
-          default: None 
+          default: null 
         external_sub_step_config:
           type: object
           description: external substep config
@@ -5199,20 +5245,20 @@ components:
           type: boolean
           description: Indicated if a substep is external
           nullable: true
-          example: true
+          example: false
           default: false
         external_system:
           type: string
           description: Description of workflow substep step
           nullable: true
           example: null
-          default: None 
+          default: null 
         description:
           type: string
           description: Description of workflow step
           nullable: true
           example: This is substep description
-          default: None 
+          default: null 
       required:
         - actions
         - label
@@ -5226,7 +5272,7 @@ components:
       properties:
         name:
           type: string
-          description: Name of the workflow
+          description: Name of the Webhook
           example: Webhook 1
         description:
           type: string
@@ -5241,8 +5287,11 @@ components:
           description: webhook url secret 
           example: secret121
         event_names:
+          type: array
           description: List of the webhook event names
-          type: array of string
+          items:
+            type: string
+            example: "asset_added"
           example: ["asset_added","asset_removed"]       
       required:
         - name
@@ -5257,7 +5306,7 @@ components:
       properties:
         name:
           type: string
-          description: Name of the workflow
+          description: Name of the app
           example: App 1
         description:
           type: string
@@ -5268,8 +5317,11 @@ components:
           description: Homepage url for app
           example: https://example1.com
         authorization_callback_urls:
+          type: array
           description: List of the webhook app authorization callback urls
-          type: array of string
+          items:
+            type: string
+            example: "https://example1.com"
           example: ["https://example1.com","https://example2.com"]
         expose_email:
           type: boolean
@@ -5293,34 +5345,37 @@ components:
       properties:
         name:
           type: string
-          description: name of template
+          description: Name of template
           example: Template 1
         description:
           type: string
-          description: description of template
+          description: Description of template
           example: Template description
         public_description:
           type: string
           description: Public description of template
           example: Template public description
         form_fields:
-          array: array
+          type: array
           description: List of the template form_fields
           items:
             $ref: '#/components/schemas/SettingTemplateFormField'
         sections:
-          array: array
+          type: array
           description: List of the template sections
           items:
             $ref: '#/components/schemas/SettingTemplateSection'
         instructions:
-          array: array
+          type: array
           description: List of the template instructions
           items:
             $ref: '#/components/schemas/SettingTemplateInstruction'
         types:
-          type: array of string
+          type: array
           description: List of type of template
+          items:
+            type: string
+            example: "campaign_brief"
           example: [ "campaign_brief", "task_brief","work_request" ]
       required:
         - name
@@ -5348,7 +5403,7 @@ components:
           description: Indicates if the form field is required
           example: false   
         logic_rules:
-          array: array
+          type: array
           description: List of the template logic rules
           items:
             $ref: '#/components/schemas/SettingTemplateLogicRule'  
@@ -5380,58 +5435,94 @@ components:
       properties:
         action:
           type: object
-          properties:
-            target_field:
-              type: object
-              additionalProperties: false
-              properties:
-                identifier:
-                  label: string
-                  description: Name of the template section
-                  example: end_of_form 
-                custom_field_type:
-                  label: string
-                  description: Name of the template section
-                  nullable: true
-                  example: null 
-                type:
-                  label: string
-                  description: Name of the template section
-                  example: end_of_form 
-            type:
-              type: string
-              description: Name of the form field
-              example: jump_to  
-            values:
-              type: array of string
-              description: List of type of template
-              example: []
+          description: Template logic rule action
+          $ref: '#/components/schemas/SettingTemplateLogicRuleAction' 
         condition:
           type: object
           additionalProperties: false
-          properties:
-            operator:
-              label: string
-              description: Name of the template section
-              example: equal 
-            values:
-              type: array of string
-              description: List of type of template
-              example: [ "choice1"]
+          description: Logic rule action associated condition
+          $ref: '#/components/schemas/SettingTemplateLogicRuleCondition'
       required:
         - action 
         - condition
+
+    SettingTemplateLogicRuleCondition:
+      type: object
+      additionalProperties: false
+      description: Logic rule action associated condition
+      properties:
+        operator:
+          type: string
+          description: The operator for logic rule action
+          example: equal 
+        values:
+          type: array
+          description: List of label or custom field choice
+          items:
+            type: string
+            example: "choice1"
+          example: [ "choice1" ]
+      required:
+        - operator 
+        - values
+    
+    SettingTemplateLogicRuleAction:
+      type: object
+      description: Template logic rule action
+      additionalProperties: false
+      properties:
+        target_field:
+          type: object
+          $ref: '#/components/schemas/SettingTemplateLogicRuleTargetField' 
+        type:
+          type: string
+          description: Logic rule action
+          example: jump_to  
+        values:
+          type: array
+          description: List of name of target of action
+          items:
+            type: string
+            example: "a choice"
+          example: []
+      required:
+        - target_field 
+        - type
+        - values
+    
+    SettingTemplateLogicRuleTargetField:
+      type: object
+      description: Template logic rule action's target field
+      additionalProperties: false
+      properties:
+        identifier:
+          type: string
+          description: Name of the target field identifier
+          example: end_of_form
+        custom_field_type:
+          type: string
+          description: Type of custom field if the target field is a customfield
+          example: null
+          default: null
+        type:
+          type: string
+          description: Type of the target field identifier
+          example: end_of_form
+      required:
+        - identifier 
+        - custom_field_type
+        - type
 
     SettingTemplateSection:
       type: object
       additionalProperties: false
       properties:
         label:
-          label: array of string
+          type: string
           description: Name of the template section
           example: Test section 
         id:
-          id: string
+          type: string
           description: Id of the template section
           example: 9ec506f480dbc2d5f6919168ae448c41
       required:
@@ -5443,11 +5534,11 @@ components:
       additionalProperties: false
       properties:
         description:
-          label: string
+          type: string
           description: Description of the template instruction
           example: Test instruction description
         id:
-          id: string
+          type: string
           description: Id of the template instruction
           example: 9ec506f480dbc2d5f6919168ae448c40
       required:
@@ -5472,8 +5563,11 @@ components:
           description: Name of the rule operator
           example: equal
         values:
+          type: array
           description: List of the associated label/custom field choice
-          type: array of string
+          items:
+            type: string
+            example: "value1"
           example: ["value1","value2"]
         unit:
           type: string
@@ -5507,8 +5601,11 @@ components:
           items:
             $ref: '#/components/schemas/SettingRoutingRuleAssociatedRule'
         watchers:
+          type: array
           description: List of the routing rule watchers email
-          type: array of string 
+          items:
+            type: string
+            example: "examplewatcher@gmail.com"
           example: ["examplewatcher@gmail.com"]            
         description:
           type: string
@@ -5531,32 +5628,53 @@ components:
       additionalProperties: false
       properties:
         labels:
+          type: array
           description: List of the label names
-          type: array of string 
+          items:
+            type: string
+            example: "A LabelGroup"
           example: ["A LabelGroup"]
         custom_fields:
+          type: array
           description: List of the custom field names
-          type: array of string 
+          items:
+            type: string
+            example: "A Custom Field" 
           example: ["A Custom Field"]
         workflows:
+          type: array
           description: List of the workflow names
-          type: array of string 
+          items:
+            type: string
+            example: "A WorkFlow"
           example: ["A WorkFlow"]
         webhooks:
+          type: array
           description: List of the webhook names
-          type: array of string 
+          items:
+            type: string
+            example: "A Webhook"
           example: ["A Webhook"]
         apps:
+          type: array
           description: List of the app names
-          type: array of string 
+          items:
+            type: string
+            example: "A App"
           example: ["A App"]
         templates:
+          type: array
           description: List of the template names
-          type: array of string 
+          items:
+            type: string
+            example: "A Template"
           example: ["A Template"]
         routing_rules:
+          type: array
           description: List of the routing rule names
-          type: array of string 
+          items:
+            type: string
+            example: "A routing Rule"
           example: ["A routing Rule"]
       required:
         - labels
